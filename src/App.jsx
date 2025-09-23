@@ -1,4 +1,4 @@
-﻿function App() {
+﻿export default function App() {
   const [showWorldCoin, setShowWorldCoin] = useState(false);
   
   return (
