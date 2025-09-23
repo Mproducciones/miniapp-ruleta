@@ -6,6 +6,7 @@ export default defineConfig({
   plugins: [react()],
   server: {
     host: true,
-    allowedHosts: ['unsymmetrized-transitionally-hiroko.ngrok-free.dev']
-  }
+    allowedHosts: ['*.ngrok-free.dev']
+  },
+  base: '/miniapp-ruleta/' // ¡Esta es la línea que necesitas agregar!
 })
