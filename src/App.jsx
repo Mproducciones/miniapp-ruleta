@@ -1,13 +1,21 @@
-﻿import React from 'react'; // <--- Añade esta línea
-import ColorPlaneGame from './components/ColorPlaneGame';
-import './App.css';
-
-function App() {
+﻿function App() {
+  const [showWorldCoin, setShowWorldCoin] = useState(false);
+  
   return (
-    <div className="App">
-      <ColorPlaneGame />
+    <div>
+      <RouletteGame /> {/* Muestra el juego desde el principio */}
+
+      {/* Solo muestra el botón para verificar con Worldcoin */}
+      {showWorldCoin ? (
+        <WorldIDKit
+          // ...configuración...
+          onSuccess={() => {/* Lógica para apostar */}}
+        />
+      ) : (
+        <button onClick={() => setShowWorldCoin(true)}>
+          Verificar y Apostar
+        </button>
+      )}
     </div>
   );
 }
-
-export default App;
