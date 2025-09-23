@@ -7,6 +7,5 @@ export default defineConfig({
   server: {
     host: true,
     allowedHosts: ['*.ngrok-free.dev']
-  },
-  base: '/miniapp-ruleta/' // ¡Esta es la línea que necesitas agregar!
+  }
 })
