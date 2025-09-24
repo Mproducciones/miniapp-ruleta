@@ -11,7 +11,7 @@ app.post("/api/verify", async (req, res) => {
     const { proof, nullifier_hash, merkle_root, signal } = req.body;
 
     // Llamada a la API de Worldcoin
-    const response = await fetch("https://developer.worldcoin.org/api/v1/verify", {
+    const response = await fetch("https://developer.worldcoin.org/api/v2/verify", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
