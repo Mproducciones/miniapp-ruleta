@@ -1,4 +1,5 @@
-﻿import { IDKitWidget } from '@worldcoin/idkit';
+﻿import React from 'react';
+import { IDKitWidget } from '@worldcoin/idkit';
 import { useState } from 'react';
 import './App.css'; // Asegúrate de que el archivo de estilos exista
 
