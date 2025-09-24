@@ -19,7 +19,7 @@ function App() {
       ) : (
         // Si no está verificado, muestra la pantalla de bienvenida con el botón
         <IDKitWidget
-          app_id="¡K4$!n0" // Reemplaza esto con tu ID
+          app_id="api_a2V5XzRiZGQ1ODczMmJhZjI3YTI1ZTViYzQzNTk0MDk4YmM1OnNrX2M5Njk1YzU5NmZhY2Y4NTUzY2MwNzRiYzFiNDhiNWRkNGRkOWFiNDZkMDFlOGViYQ" // Reemplaza esto con tu ID
           onSuccess={() => setIsVerified(true)}
           // ...otras configuraciones...
         >
