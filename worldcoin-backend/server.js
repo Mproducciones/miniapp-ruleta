@@ -17,8 +17,8 @@ app.post("/api/verify", async (req, res) => {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        app_id: "⚠️ REEMPLAZA_CON_TU_APP_ID", // copia el App ID de tu Worldcoin Dev Portal
-        action: "verificacion_juego",        // mismo "action" que usas en tu IDKitWidget
+        app_id: "app_d1ea58fce8cb903e9be8b8dbf34da3a2", // copia el App ID de tu Worldcoin Dev Portal
+        action: "PlayGame",        // mismo "action" que usas en tu IDKitWidget
         signal: signal || "default-signal",  // opcional, puede ser un userID o algo que identifique la sesión
         proof,
         nullifier_hash,
