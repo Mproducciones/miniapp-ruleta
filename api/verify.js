@@ -1,9 +1,4 @@
-﻿import React, { useState } from 'react';
-// IMPORTANTE:
-// Para que esto funcione, necesitas instalar la biblioteca de IDKit en tu proyecto local
-// ejecutando: npm install @worldcoin/idkit
-// La siguiente línea debe estar descomentada en tu entorno local:
-// import { IDKitWidget } from '@worldcoin/idkit';
+import React, { useState } from 'react';
 
 function App() {
   const [isVerified, setIsVerified] = useState(false);
@@ -57,31 +52,6 @@ function App() {
           <h1 className="text-3xl font-bold mb-4">Bienvenido a la Ruleta</h1>
           <p className="text-lg mb-6 text-gray-400">{message}</p>
           
-          {/* El siguiente código está comentado para que la aplicación funcione en este entorno. */}
-          {/* En tu entorno local, si tienes instalado IDKit, puedes usar este código en su lugar. */}
-          {/* <IDKitWidget
-            app_id="app_d1ea58fce8cb903e9be8b8dbf34da3a2"
-            action="login"
-            onSuccess={handleVerify}
-            title="Verificación de usuario"
-            description="Por favor, verifique su identidad para acceder al juego."
-          >
-            {({ open }) => (
-              <button
-                onClick={open}
-                disabled={isVerifying}
-                className={`px-6 py-3 font-semibold rounded-full transition-colors duration-300 ${
-                  isVerifying
-                    ? 'bg-gray-500 cursor-not-allowed'
-                    : 'bg-indigo-600 hover:bg-indigo-700'
-                }`}
-              >
-                {isVerifying ? 'Verificando...' : 'Conectarse con Worldcoin'}
-              </button>
-            )}
-          </IDKitWidget> */}
-          
-          {/* Botón de simulación que se usa en este entorno. */}
           <button
             onClick={() => handleVerify({})} 
             disabled={isVerifying}
