@@ -1,33 +1,39 @@
-﻿import React from 'react';
+﻿import React, { useState } from 'react';
 import { IDKitWidget } from '@worldcoin/idkit';
-import { useState } from 'react';
-import './App.css'; // Asegúrate de que el archivo de estilos exista
+import './App.css'; 
+
+// Asume que tu componente de la ruleta se llama RouletteGame
+// import RouletteGame from './components/RouletteGame'; 
 
 function App() {
-  const [showWorldCoin, setShowWorldCoin] = useState(false);
+  const [isVerified, setIsVerified] = useState(false);
 
   return (
     <div>
-      {/* Tu juego de ruleta va aquí. Asegúrate de que esté visible. */}
-      {/* Por ejemplo: */}
-      <h1>¡Bienvenido a la Ruleta!</h1>
-      {/* <RouletteGame /> */}
-
-      {/* Este botón o lógica solo aparece cuando el usuario quiere apostar. */}
-      {showWorldCoin ? (
+      {isVerified ? (
+        // Si el usuario está verificado, muestra el juego completo
+        <div>
+          <p>¡Bienvenido! Ahora puedes jugar a la ruleta.</p>
+          {/* <RouletteGame /> */}
+        </div>
+      ) : (
+        // Si no está verificado, muestra la pantalla de bienvenida con el botón
         <IDKitWidget
           app_id="app_staging_..." // Reemplaza esto con tu ID
-          onSuccess={() => {/* Lógica para apostar */}}
+          onSuccess={() => setIsVerified(true)}
+          // ...otras configuraciones...
         >
-          {({ open }) => <button onClick={open}>Verificar y Apostar</button>}
+          {({ open }) => (
+            <div>
+              <h1>Bienvenido a la Ruleta</h1>
+              <p>Para jugar, debes verificar tu identidad.</p>
+              <button onClick={open}>Conectarse con Worldcoin</button>
+            </div>
+          )}
         </IDKitWidget>
-      ) : (
-        <button onClick={() => setShowWorldCoin(true)}>
-          Verificar y Apostar
-        </button>
       )}
     </div>
   );
 }
 
-export default App; // Asegúrate de que esta línea esté al final
+export default App;
