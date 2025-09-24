@@ -1,60 +1,65 @@
-﻿import React, { useState } from "react";
-import { IDKitWidget } from "@worldcoin/idkit";
-import ColorPlaneGame from "./ColorPlaneGame.jsx"; // tu componente actual del juego (el que pegaste)
+﻿import React, { useState } from 'react';
+import { IDKitWidget } from '@worldcoin/idkit';
+import './App.css';
 
-export default function App() {
-  const [verified, setVerified] = useState(false);
+function App() {
+  const [isVerified, setIsVerified] = useState(false);
 
-  const onSuccess = (proof) => {
-    console.log("✅ Verificación exitosa:", proof);
-    setVerified(true);
+  // Esta función ahora enviará la prueba al servidor para su verificación.
+  const handleVerify = async (result) => {
+    try {
+      const response = await fetch('http://localhost:3001/api/verify', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(result),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        console.log("El servidor confirmó la verificación.");
+        setIsVerified(true);
+      } else {
+        console.error("Error del servidor:", data.message);
+      }
+    } catch (error) {
+      console.error("Error en la conexión con el servidor:", error);
+    }
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-900 text-white">
-      {!verified ? (
-        <div className="text-center p-6 bg-gray-800 rounded-xl shadow-lg max-w-md">
-          <img
-            src="/assets/logo.png"
-            alt="logo"
-            className="w-40 mx-auto mb-4"
-          />
-          <h1 className="text-2xl font-bold text-teal-400 mb-2">
-            Verifícate para jugar
-          </h1>
-          <p className="text-gray-300 mb-6">
-            Debes comprobar tu identidad con World ID antes de comenzar el
-            juego.
-          </p>
-
-          <div className="flex flex-col gap-4">
-            <IDKitWidget
-              action="avion-play" // id de tu acción en worldcoin dev portal
-              app_id="tu-app-id-aqui" // remplaza con tu APP ID de Worldcoin
-              onSuccess={onSuccess}
-            >
-              {({ open }) => (
-                <button
-                  onClick={open}
-                  className="px-6 py-3 bg-teal-600 hover:bg-teal-700 text-white font-bold rounded-lg shadow-lg transition transform hover:scale-105"
-                >
-                  🔐 Verificar con World ID
-                </button>
-              )}
-            </IDKitWidget>
-
-            {/* Botón de modo prueba para desarrollo */}
-            <button
-              onClick={() => setVerified(true)}
-              className="px-6 py-3 bg-gray-600 hover:bg-gray-700 text-white font-bold rounded-lg shadow-lg transition transform hover:scale-105"
-            >
-              🛠️ Modo Prueba
-            </button>
-          </div>
+    <div className="flex items-center justify-center min-h-screen bg-gray-900 text-white">
+      {isVerified ? (
+        <div className="game-screen text-center p-8 bg-gray-900 min-h-screen text-white flex flex-col items-center justify-center">
+          <h1 className="text-4xl font-bold mb-4">¡Verificación Exitosa!</h1>
+          <p className="text-xl mb-8">Ahora puedes jugar a la ruleta.</p>
         </div>
       ) : (
-        <ColorPlaneGame />
+        <div className="text-center p-8 bg-gray-800 rounded-lg shadow-xl">
+          <h1 className="text-3xl font-bold mb-4">Bienvenido a la Ruleta</h1>
+          <p className="text-lg mb-6 text-gray-400">Para jugar, debes verificar tu identidad.</p>
+          <IDKitWidget
+            app_id="tu_app_id"
+            action="verificacion_juego"
+            onSuccess={handleVerify}
+            title="Verificación de usuario"
+            description="Por favor, verifique su identidad para acceder al juego."
+          >
+            {({ open }) => (
+              <button
+                onClick={open}
+                className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-full transition-colors duration-300"
+              >
+                Conectarse con Worldcoin
+              </button>
+            )}
+          </IDKitWidget>
+        </div>
       )}
     </div>
   );
 }
+
+export default App;
