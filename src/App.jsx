@@ -1,6 +1,6 @@
 ﻿import React, { useState } from "react";
 import { IDKitWidget } from "@worldcoin/idkit";
-import ColorPlaneGame from "./ColorPlaneGame.js"; // tu componente actual del juego (el que pegaste)
+import ColorPlaneGame from "./ColorPlaneGame.jsx"; // tu componente actual del juego (el que pegaste)
 
 export default function App() {
   const [verified, setVerified] = useState(false);
