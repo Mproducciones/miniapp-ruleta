@@ -42,7 +42,7 @@ function App() {
           <p className="text-lg mb-6 text-gray-400">Para jugar, debes verificar tu identidad.</p>
           <IDKitWidget
             app_id="app_d1ea58fce8cb903e9be8b8dbf34da3a2"
-            action="verificacion_juego"
+            action="color plane play"
             onSuccess={handleVerify}
             title="Verificación de usuario"
             description="Por favor, verifique su identidad para acceder al juego."

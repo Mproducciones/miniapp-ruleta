@@ -1,18 +1,20 @@
 {
   "name": "worldcoin-backend",
   "version": "1.0.0",
-  "main": "index.js",
+  "description": "Backend para verificar la identidad con Worldcoin.",
+  "main": "server.js",
+  "type": "module",
   "scripts": {
+    "start": "node server.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
-  "description": "",
   "dependencies": {
-    "@worldcoin/idkit": "^0.2.15",
-    "@worldcoin/idkit-core": "^2.1.0",
+    "@worldcoin/idkit": "^1.1.1",
     "cors": "^2.8.5",
-    "express": "^5.1.0"
+    "express": "^4.19.2",
+    "node-fetch": "^2.6.1"
   }
 }

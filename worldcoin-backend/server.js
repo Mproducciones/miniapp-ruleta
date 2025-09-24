@@ -1,45 +1,45 @@
-import express from 'express';
-import cors from 'cors';
-import { verify } from '@worldcoin/idkit';
+import express from "express";
+import cors from "cors";
+import fetch from "node-fetch";
 
 const app = express();
-const PORT = 3001;
-
 app.use(cors());
 app.use(express.json());
 
-app.post('/verify', async (req, res) => {
+app.post("/api/verify", async (req, res) => {
   try {
-    const { proof, public_signals } = req.body;
+    const { proof, nullifier_hash, merkle_root, signal } = req.body;
 
-    const APP_ID = "app_staging_040375f564177d0137cfac4a180f1464";
-    const ACTION_ID = "my_action";
-
-    const verifyResult = await verify(proof, public_signals, {
-      app_id: APP_ID,
-      action: ACTION_ID,
+    // Llamada a la API de Worldcoin
+    const response = await fetch("https://developer.worldcoin.org/api/v1/verify", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        app_id: "⚠️ REEMPLAZA_CON_TU_APP_ID", // copia el App ID de tu Worldcoin Dev Portal
+        action: "verificacion_juego",        // mismo "action" que usas en tu IDKitWidget
+        signal: signal || "default-signal",  // opcional, puede ser un userID o algo que identifique la sesión
+        proof,
+        nullifier_hash,
+        merkle_root
+      }),
     });
 
-    if (verifyResult) {
-      res.status(200).json({
-        success: true,
-        message: "Verificación exitosa",
-      });
+    const data = await response.json();
+    console.log("🔎 Respuesta de Worldcoin:", data);
+
+    if (data.success) {
+      res.json({ ok: true, data });
     } else {
-      res.status(400).json({ 
-        success: false, 
-        detail: "Verificación fallida en el servidor" 
-      });
+      res.status(400).json({ ok: false, error: data });
     }
-  } catch (error) {
-    console.error("Error en la verificación del backend:", error);
-    res.status(500).json({ 
-      success: false, 
-      detail: "Error interno del servidor" 
-    });
+  } catch (err) {
+    console.error("❌ Error en el servidor:", err);
+    res.status(500).json({ ok: false, message: "Error interno del servidor" });
   }
 });
 
-app.listen(PORT, () => {
-  console.log(`Servidor de verificación de Worldcoin corriendo en http://localhost:${PORT}`);
+app.listen(3001, () => {
+  console.log("✅ Backend corriendo en http://localhost:3001");
 });
