@@ -1,5 +1,5 @@
 ﻿import React, { useRef, useEffect, useState, useCallback } from "react";
-import { IDKitWidget, useIDKit } from '@worldcoin/idkit';
+import { IDKitWidget } from '@worldcoin/idkit';
 import { motion } from "framer-motion";
 import "./ColorPlaneGame.css";
 
@@ -31,27 +31,27 @@ const useSound = (url) => {
 };
 
 /* ===== CONFIG ===== */
-// Usamos un balance de puntos virtuales en lugar de WLD
 const INITIAL_PLAYER_BALANCE = 1000.0;
 const MAX_HISTORY = 10;
 const MAX_BET = 100.0;
+const API_URL = "http://localhost:3001"; // 🚨 Reemplaza con la URL de tu backend en producción
 
-/* ===== SECCIONES RUEDA (MODIFICADAS Y CON MULTIPLICADORES) ===== */
+/* ===== SECCIONES RUEDA ===== */
 const sections = [
-  { hex: "#ff0000", name: "ROJO", multiplier: 1.5 }, // 1
-  { hex: "#0066ff", name: "AZUL", multiplier: 2 }, // 2
-  { hex: "#ff0000", name: "ROJO", multiplier: 1.5 }, // 3
-  { hex: "#ffffff", name: "BLANCO", multiplier: 3 }, // 4
-  { hex: "#ff0000", name: "ROJO", multiplier: 1.5 }, // 5
-  { hex: "#0066ff", name: "AZUL", multiplier: 2 }, // 6
-  { hex: "#ff0000", name: "ROJO", multiplier: 1.5 }, // 7
-  { hex: "#000000", name: "NEGRO", multiplier: 0 }, // 8 (pierde)
-  { hex: "#ff0000", name: "ROJO", multiplier: 1.5 }, // 9
-  { hex: "#0066ff", name: "AZUL", multiplier: 2 }, // 10
-  { hex: "#ff0000", name: "ROJO", multiplier: 1.5 }, // 11
-  { hex: "#ffffff", name: "BLANCO", multiplier: 3 }, // 12
-  { hex: "#ff0000", name: "ROJO", multiplier: 1.5 }, // 13
-  { hex: "#0066ff", name: "AZUL", multiplier: 2 }, // 14
+  { hex: "#ff0000", name: "ROJO", multiplier: 1.5 },
+  { hex: "#0066ff", name: "AZUL", multiplier: 2 },
+  { hex: "#ff0000", name: "ROJO", multiplier: 1.5 },
+  { hex: "#ffffff", name: "BLANCO", multiplier: 3 },
+  { hex: "#ff0000", name: "ROJO", multiplier: 1.5 },
+  { hex: "#0066ff", name: "AZUL", multiplier: 2 },
+  { hex: "#ff0000", name: "ROJO", multiplier: 1.5 },
+  { hex: "#000000", name: "NEGRO", multiplier: 0 },
+  { hex: "#ff0000", name: "ROJO", multiplier: 1.5 },
+  { hex: "#0066ff", name: "AZUL", multiplier: 2 },
+  { hex: "#ff0000", name: "ROJO", multiplier: 1.5 },
+  { hex: "#ffffff", name: "BLANCO", multiplier: 3 },
+  { hex: "#ff0000", name: "ROJO", multiplier: 1.5 },
+  { hex: "#0066ff", name: "AZUL", multiplier: 2 },
 ];
 
 export default function ColorPlaneGame() {
@@ -78,9 +78,7 @@ export default function ColorPlaneGame() {
   const [view, setView] = useState("game");
   const radius = 160;
 
-  // Integración del SDK de Worldcoin Mini Apps
-  const { isConnected } = useIDKit();
-  const [userSub, setUserSub] = useState(null);
+  const [isVerified, setIsVerified] = useState(false);
 
   const playSpinSound = useSound('/sounds/spin.mp3');
   const playWinSound = useSound('/sounds/win.mp3');
@@ -420,20 +418,35 @@ export default function ColorPlaneGame() {
         style={{ width: "90%", maxWidth: 350, marginTop: 8 }}
       />
 
-      {!isConnected ? (
-        <div style={{ color: '#fff', textAlign: 'center', marginTop: 50 }}>
-          <p>Conectando a la mini app de Worldcoin...</p>
-        </div>
-      ) : !userSub ? (
+      {!isVerified ? (
         <div style={{ padding: '20px', textAlign: 'center', marginTop: 50, background: 'rgba(0,0,0,0.5)', borderRadius: '12px', boxShadow: '0 4px 10px rgba(0,0,0,0.3)' }}>
           <h2 style={{ color: '#fff', fontSize: '24px' }}>¡Bienvenido! 👋</h2>
           <p style={{ color: '#ddd', marginBottom: '20px' }}>Para empezar a jugar, conéctate con World ID.</p>
           <IDKitWidget
             app_id="app_staging_040375f564177d0137cfac4a180f1464"
             action="my_action"
-            onSuccess={(result) => {
-              console.log("Login successful:", result);
-              setUserSub(result.sub);
+            handleVerify={async (result) => {
+              try {
+                const response = await fetch(`${API_URL}/verify`, {
+                  method: "POST",
+                  headers: {
+                    "Content-Type": "application/json",
+                  },
+                  body: JSON.stringify(result),
+                });
+                if (response.ok) {
+                  const data = await response.json();
+                  console.log("Verificación exitosa en el backend:", data);
+                  setIsVerified(true);
+                  alert("¡Verificación de World ID exitosa! Ya puedes jugar.");
+                } else {
+                  const errorData = await response.json();
+                  throw new Error(errorData.detail || "Verificación fallida");
+                }
+              } catch (error) {
+                console.error("Error durante la verificación:", error);
+                alert(`Error en la verificación: ${error.message}`);
+              }
             }}
           >
             {({ open }) => (
@@ -513,7 +526,6 @@ export default function ColorPlaneGame() {
                 />
                 <motion.img
                   src="/assets/plane.png"
-                  alt="plane"
                   variants={planeVariants}
                   animate={planeAction}
                   initial="idle"
@@ -530,7 +542,7 @@ export default function ColorPlaneGame() {
                 />
                 <button
                   onClick={spin}
-                  disabled={spinning}
+                  disabled={spinning || isRoundActive}
                   style={{
                     position: "absolute",
                     top: "50.5%",
@@ -583,6 +595,7 @@ export default function ColorPlaneGame() {
                 <motion.button
                   onClick={() => addBet("rojo")}
                   whileTap={{ scale: 0.9, y: 3, boxShadow: "0 2px 4px rgba(0,0,0,0.4)" }}
+                  disabled={spinning}
                   style={{
                     width: 90,
                     height: 90,
@@ -606,6 +619,7 @@ export default function ColorPlaneGame() {
                 <motion.button
                   onClick={() => addBet("azul")}
                   whileTap={{ scale: 0.9, y: 3, boxShadow: "0 2px 4px rgba(0,0,0,0.4)" }}
+                  disabled={spinning}
                   style={{
                     width: 90,
                     height: 90,
@@ -629,6 +643,7 @@ export default function ColorPlaneGame() {
                 <motion.button
                   onClick={() => addBet("blanco")}
                   whileTap={{ scale: 0.9, y: 3, boxShadow: "0 2px 4px rgba(0,0,0,0.4)" }}
+                  disabled={spinning}
                   style={{
                     width: 90,
                     height: 90,
@@ -654,6 +669,7 @@ export default function ColorPlaneGame() {
                 <motion.button
                   onClick={repeatBet}
                   whileTap={{ scale: 0.9, y: 3, boxShadow: "0 2px 4px rgba(0,0,0,0.4)" }}
+                  disabled={spinning}
                   style={{ padding: "8px 14px", borderRadius: 8 }}
                 >
                   🔄 Repetir
@@ -661,6 +677,7 @@ export default function ColorPlaneGame() {
                 <motion.button
                   onClick={doubleBet}
                   whileTap={{ scale: 0.9, y: 3, boxShadow: "0 2px 4px rgba(0,0,0,0.4)" }}
+                  disabled={spinning}
                   style={{ padding: "8px 14px", borderRadius: 8 }}
                 >
                   ✖2 Doblar
@@ -668,6 +685,7 @@ export default function ColorPlaneGame() {
                 <motion.button
                   onClick={clearBets}
                   whileTap={{ scale: 0.9, y: 3, boxShadow: "0 2px 4px rgba(0,0,0,0.4)" }}
+                  disabled={spinning}
                   style={{ padding: "8px 14px", borderRadius: 8 }}
                 >
                   Cero Apuestas
