@@ -1,4 +1,4 @@
-﻿import { useState } from 'react';
+﻿import React, { useState } from 'react';
 import { IDKitWidget } from '@worldcoin/idkit';
 import './App.css';
 
@@ -6,7 +6,6 @@ function App() {
   const [isVerified, setIsVerified] = useState(false);
 
   const handleVerify = (result) => {
-    // Esta función se llama cuando la verificación es exitosa
     console.log("Verificación exitosa. Resultado:", result);
     setIsVerified(true);
   };
@@ -21,9 +20,9 @@ function App() {
       ) : (
         // Si no está verificado, muestra la pantalla de bienvenida con el botón
         <IDKitWidget
-          app_id="tu_app_id" // Asegúrate de que este ID sea el correcto
-          onSuccess={handleVerify} // Asigna la función 'handleVerify' al evento de éxito
-          // action="verify" // Podrías necesitar esto si tienes múltiples acciones
+          app_id="tu_app_id"
+          onSuccess={handleVerify}
+          // action="verify"
         >
           {({ open }) => (
             <div>
