@@ -41,7 +41,7 @@ function App() {
           <h1 className="text-3xl font-bold mb-4">Bienvenido a la Ruleta</h1>
           <p className="text-lg mb-6 text-gray-400">Para jugar, debes verificar tu identidad.</p>
           <IDKitWidget
-            app_id="tu_app_id"
+            app_id="app_d1ea58fce8cb903e9be8b8dbf34da3a2"
             action="verificacion_juego"
             onSuccess={handleVerify}
             title="Verificación de usuario"
