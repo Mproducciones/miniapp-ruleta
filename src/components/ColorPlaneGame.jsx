@@ -105,6 +105,19 @@ export default function ColorPlaneGame() {
 
   const radius = 160;
 
+  /* ---- Conic gradient wheel (reemplaza canvas — siempre visible) ---- */
+  const wheelGradient = useMemo(() => {
+    const deg = 360 / sections.length;
+    const stops = sections.map((sec, i) => {
+      // NEGRO: azul muy oscuro para distinguirse del fondo negro
+      const color = sec.hex === '#000000' ? '#1a0a2e' : sec.hex;
+      return `${color} ${(i * deg).toFixed(3)}deg ${((i + 1) * deg).toFixed(3)}deg`;
+    });
+    return `conic-gradient(from 90deg, ${stops.join(', ')})`;
+  }, []);
+
+  const sectionAngle = 360 / sections.length; // degrees per section
+
   /* ---- Starfield (generated once) ---- */
   const stars = useMemo(() => Array.from({ length: 50 }, (_, i) => ({
     id: i,
@@ -680,23 +693,97 @@ export default function ColorPlaneGame() {
                 <div key={i} className="speed-ring" style={{ '--delay': `${i * 0.38}s` }} />
               ))}
 
-              {/* Canvas wheel with glow */}
+              {/* ── RUEDA CSS (conic-gradient, siempre visible) ── */}
               <div style={{
-                width: "100%", aspectRatio: "1",
-                filter: spinning
-                  ? "drop-shadow(0 0 18px rgba(255,200,0,0.75)) drop-shadow(0 0 45px rgba(255,100,0,0.45))"
-                  : "drop-shadow(0 0 6px rgba(255,200,0,0.2))",
-                transition: "filter 0.6s",
+                width: "100%", aspectRatio: "1", position: "relative",
+                borderRadius: "50%",
+                background: wheelGradient,
+                boxShadow: spinning
+                  ? "0 0 0 6px #b8860b, 0 0 35px rgba(255,200,0,0.65), 0 0 65px rgba(255,100,0,0.35), 0 0 10px rgba(0,0,0,0.8)"
+                  : "0 0 0 5px #7a5c0a, 0 0 18px rgba(0,0,0,0.7)",
+                transition: "box-shadow 0.5s",
               }}>
-                <canvas
-                  ref={canvasRef}
-                  width={radius * 2}
-                  height={radius * 2}
-                  style={{ width: "100%", height: "100%" }}
-                />
+                {/* Brillo glossy */}
+                <div style={{
+                  position: "absolute", inset: 0, borderRadius: "50%",
+                  background: "radial-gradient(circle at 35% 28%, rgba(255,255,255,0.22) 0%, rgba(255,255,255,0.04) 45%, rgba(0,0,0,0.15) 100%)",
+                  pointerEvents: "none", zIndex: 1,
+                }} />
+
+                {/* Separadores y etiquetas en SVG */}
+                <svg
+                  style={{ position: "absolute", inset: 0, width: "100%", height: "100%", zIndex: 2 }}
+                  viewBox="0 0 320 320"
+                >
+                  {/* Líneas separadoras */}
+                  {sections.map((_, i) => {
+                    const rad = (i * sectionAngle) * Math.PI / 180;
+                    return (
+                      <line key={`d${i}`}
+                        x1={160} y1={160}
+                        x2={160 + 154 * Math.cos(rad)}
+                        y2={160 + 154 * Math.sin(rad)}
+                        stroke="rgba(0,0,0,0.55)" strokeWidth={2}
+                      />
+                    );
+                  })}
+
+                  {/* Texto multiplicador */}
+                  {sections.map((sec, i) => {
+                    const midRad = (i + 0.5) * sectionAngle * Math.PI / 180;
+                    const tx = 160 + 98 * Math.cos(midRad);
+                    const ty = 160 + 98 * Math.sin(midRad);
+                    const rot = (i + 0.5) * sectionAngle + 90;
+                    const isWhite = sec.hex === "#ffffff";
+                    const isBlack = sec.hex === "#000000";
+                    return (
+                      <g key={`l${i}`} transform={`translate(${tx},${ty}) rotate(${rot})`}>
+                        <text
+                          textAnchor="middle" dominantBaseline="middle"
+                          fill={isWhite ? "#111" : "#fff"}
+                          fontSize={sec.multiplier > 0 ? 13 : 9}
+                          fontWeight="900"
+                          fontFamily="'Lilita One', Impact, sans-serif"
+                          style={{ filter: isBlack ? "none" : `drop-shadow(0 0 3px ${sec.hex})` }}
+                        >
+                          {sec.multiplier > 0 ? `x${sec.multiplier}` : "PIERDE\nTODO"}
+                        </text>
+                        {sec.multiplier === 0 && (
+                          <text textAnchor="middle" dominantBaseline="middle" fill="#ff4444" fontSize={8} fontWeight="900" y={9}>TODO</text>
+                        )}
+                      </g>
+                    );
+                  })}
+
+                  {/* Anillo interior metálico */}
+                  <circle cx={160} cy={160} r={154} fill="none" stroke="rgba(255,255,255,0.25)" strokeWidth={2} />
+                  <circle cx={160} cy={160} r={152} fill="none" stroke="rgba(0,0,0,0.5)" strokeWidth={1} />
+                </svg>
+
+                {/* Hub central */}
+                <div style={{
+                  position: "absolute", top: "50%", left: "50%",
+                  transform: "translate(-50%,-50%)",
+                  width: "18%", height: "18%", borderRadius: "50%",
+                  background: "radial-gradient(circle at 35% 30%, #fff 0%, #ccc 40%, #888 100%)",
+                  boxShadow: "0 2px 10px rgba(0,0,0,0.6), inset 0 1px 3px rgba(255,255,255,0.7)",
+                  zIndex: 5,
+                }} />
+
+                {/* Partículas burst */}
+                <div style={{ position: "absolute", inset: 0, pointerEvents: "none", zIndex: 10 }}>
+                  {burstParticles.map(p => (
+                    <div key={p.id} className="burst-particle" style={{
+                      width: p.size, height: p.size, background: p.color,
+                      boxShadow: `0 0 ${p.size * 2}px ${p.color}`,
+                      '--tx': `${Math.cos(p.angle * Math.PI / 180) * p.dist}px`,
+                      '--ty': `${Math.sin(p.angle * Math.PI / 180) * p.dist}px`,
+                    }} />
+                  ))}
+                </div>
               </div>
 
-              {/* Roulette lights overlay */}
+              {/* Luces decorativas (solo el overlay de luces, blend screen para que no tape) */}
               <motion.img
                 src="/assets/roulette_lights_only.png"
                 alt="Luces"
@@ -705,29 +792,13 @@ export default function ColorPlaneGame() {
                 transition={lightTransition}
                 initial="idle"
                 style={{
-                  position: "absolute", top: -20, left: -23,
-                  width: "111%", height: "111%",
+                  position: "absolute", top: -18, left: -20,
+                  width: "110%", height: "110%",
                   mixBlendMode: "screen",
                   pointerEvents: "none", zIndex: 15,
+                  opacity: 0.9,
                 }}
               />
-
-              {/* Particle burst */}
-              <div style={{ position: "absolute", inset: 0, pointerEvents: "none", zIndex: 30 }}>
-                {burstParticles.map(p => (
-                  <div
-                    key={p.id}
-                    className="burst-particle"
-                    style={{
-                      width: p.size, height: p.size,
-                      background: p.color,
-                      boxShadow: `0 0 ${p.size * 2}px ${p.color}, 0 0 ${p.size * 4}px ${p.color}55`,
-                      '--tx': `${Math.cos(p.angle * Math.PI / 180) * p.dist}px`,
-                      '--ty': `${Math.sin(p.angle * Math.PI / 180) * p.dist}px`,
-                    }}
-                  />
-                ))}
-              </div>
 
               {/* Orbital container — carries the plane */}
               <motion.div
