@@ -426,59 +426,65 @@ export default function ColorPlaneGame() {
       {!isVerified ? (
         <div style={{ padding: '20px', textAlign: 'center', marginTop: 50, background: 'rgba(0,0,0,0.5)', borderRadius: '12px', boxShadow: '0 4px 10px rgba(0,0,0,0.3)' }}>
           <h2 style={{ color: '#fff', fontSize: '24px' }}>¡Bienvenido! 👋</h2>
-          <p style={{ color: '#ddd', marginBottom: '20px' }}>Para empezar a jugar, verifica tu identidad con World ID.</p>
-          <button
-            onClick={async () => {
-              if (!MiniKit.isInstalled()) {
-                setToast({ text: 'Abre esta app dentro de World App para verificar.', type: 'info' });
-                return;
-              }
-              try {
-                const nonceRes = await fetch(`${API_URL}/api/nonce`);
-                const { nonce } = await nonceRes.json();
 
-                const result = await MiniKit.walletAuth({
-                  nonce,
-                  statement: 'Verifica tu identidad para jugar a Avión de Colores',
-                });
+          {MiniKit.isInstalled() ? (
+            <>
+              <p style={{ color: '#ddd', marginBottom: '20px' }}>Verifica tu identidad con World ID para jugar.</p>
+              <button
+                onClick={async () => {
+                  try {
+                    const nonceRes = await fetch(`${API_URL}/api/nonce`);
+                    const { nonce } = await nonceRes.json();
 
-                if (result.data?.status === 'error') {
-                  setToast({ text: 'Verificación cancelada.', type: 'lose' });
-                  return;
-                }
+                    const result = await MiniKit.walletAuth({
+                      nonce,
+                      statement: 'Verifica tu identidad para jugar a Avión de Colores',
+                    });
 
-                const res = await fetch(`${API_URL}/api/verify`, {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({
-                    payload: result.data,
-                    nonce,
-                  }),
-                });
-                const data = await res.json();
-                if (res.ok && data.ok) {
-                  setIsVerified(true);
-                } else {
-                  setToast({ text: data.message || 'Verificación fallida.', type: 'lose' });
-                }
-              } catch (err) {
-                console.error('Verify error:', err);
-                setToast({ text: `Error: ${err.message || 'Inténtalo de nuevo.'}`, type: 'lose' });
-              }
-            }}
-            style={{
-              padding: '12px 24px',
-              background: '#1c74d6',
-              color: 'white',
-              border: 'none',
-              borderRadius: '8px',
-              cursor: 'pointer',
-              fontSize: '16px',
-              fontWeight: 'bold',
-            }}
-          >
-            Verificar con World ID
-          </button>
+                    if (result.data?.status === 'error') {
+                      setToast({ text: 'Verificación cancelada.', type: 'lose' });
+                      return;
+                    }
+
+                    const res = await fetch(`${API_URL}/api/verify`, {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ payload: result.data, nonce }),
+                    });
+                    const data = await res.json();
+                    if (res.ok && data.ok) {
+                      setIsVerified(true);
+                    } else {
+                      setToast({ text: data.message || 'Verificación fallida.', type: 'lose' });
+                    }
+                  } catch (err) {
+                    console.error('Verify error:', err);
+                    setToast({ text: `Error: ${err.message || 'Inténtalo de nuevo.'}`, type: 'lose' });
+                  }
+                }}
+                style={{ padding: '12px 24px', background: '#1c74d6', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '16px', fontWeight: 'bold' }}
+              >
+                Verificar con World ID
+              </button>
+            </>
+          ) : (
+            <>
+              <p style={{ color: '#ddd', marginBottom: '8px' }}>Para verificación completa, abre esta app dentro de <strong style={{ color: '#fff' }}>World App</strong>.</p>
+              <p style={{ color: '#aaa', fontSize: 13, marginBottom: '20px' }}>O continúa como invitado para probar el juego.</p>
+              <button
+                onClick={() => setIsVerified(true)}
+                style={{ padding: '12px 24px', background: '#22c55e', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '16px', fontWeight: 'bold', display: 'block', margin: '0 auto 12px' }}
+              >
+                Jugar como invitado
+              </button>
+              <a
+                href={`https://worldcoin.org/mini-app?app_id=app_0421a6be5285baa95f9b59b01e75d91c`}
+                style={{ color: '#60a5fa', fontSize: 13 }}
+              >
+                Abrir en World App →
+              </a>
+            </>
+          )}
         </div>
       ) : (
         <>
