@@ -1,5 +1,5 @@
-const APP_ID = process.env.WORLDCOIN_APP_ID || "app_staging_040375f564177d0137cfac4a180f1464";
-const ACTION = process.env.WORLDCOIN_ACTION || "my_action";
+const APP_ID = process.env.WORLDCOIN_APP_ID || "app_0421a6be5285baa95f9b59b01e75d91c";
+const ACTION = process.env.WORLDCOIN_ACTION || "Ruleta game Coins";
 
 // Staging vs production endpoint
 const VERIFY_ENDPOINT = APP_ID.startsWith("app_staging_")

@@ -428,8 +428,8 @@ export default function ColorPlaneGame() {
           <h2 style={{ color: '#fff', fontSize: '24px' }}>¡Bienvenido! 👋</h2>
           <p style={{ color: '#ddd', marginBottom: '20px' }}>Para empezar a jugar, conéctate con World ID.</p>
           <IDKitWidget
-            app_id="app_staging_040375f564177d0137cfac4a180f1464"
-            action="my_action"
+            app_id="app_0421a6be5285baa95f9b59b01e75d91c"
+            action="Ruleta game Coins"
             handleVerify={async (result) => {
               const response = await fetch(`${API_URL}/api/verify`, {
                 method: "POST",
