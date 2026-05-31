@@ -72,7 +72,6 @@ export default function ColorPlaneGame() {
   const [bets, setBets] = useState({ rojo: 0, azul: 0, blanco: 0 });
   const [lastBets, setLastBets] = useState(null);
   const [playerBalance, setPlayerBalance] = useState(INITIAL_PLAYER_BALANCE);
-  const [planeAction, setPlaneAction] = useState("idle");
   const [lightAnimationState, setLightAnimationState] = useState('idle');
   const [history, setHistory] = useState([]);
   const [view, setView] = useState("game");
@@ -192,79 +191,61 @@ export default function ColorPlaneGame() {
     setResult(null);
     setPlayerBalance((p) => Number((p - totalBet).toFixed(8)));
     setLastBets(bets);
-    setPlaneAction("takeoff");
     setLightAnimationState('flicker');
+    playSpinSound();
 
-    const tStartSpin = setTimeout(() => {
-      playSpinSound();
-      const randomRotation = 360 * 5 + Math.floor(Math.random() * 360);
-      const final = rotation + randomRotation;
-      setRotation(final);
-      setPlaneAction("hiddenTop");
+    // El avión orbita varias vueltas + posición aleatoria final
+    const randomRotation = 360 * 7 + Math.floor(Math.random() * 360);
+    const final = rotation + randomRotation;
+    setRotation(final);
 
-      const landingStartDelay = SPIN_DUR - LANDING_APPEAR_BEFORE_STOP;
-      const tLandingStart = setTimeout(() => {
-        setPlaneAction("landing");
-      }, landingStartDelay);
-      pushTimer(tLandingStart);
+    const tEnd = setTimeout(() => {
+      // El avión empieza en la cima (12 en punto = 270° en canvas)
+      // Después de rotar `normalized` grados horario, está en canvas angle (270 + normalized) % 360
+      const normalized = (final % 360 + 360) % 360;
+      const sectionSize = 360 / sections.length;
+      const canvasAngle = (270 + normalized) % 360;
+      const index = Math.floor(canvasAngle / sectionSize) % sections.length;
+      const landed = sections[index];
+      setResult(landed);
 
-      const tEnd = setTimeout(() => {
-        const normalized = (final % 360 + 360) % 360;
-        const sectionSize = 360 / sections.length;
-        const pointerAngle = 270;
-        const landedAngle = (pointerAngle - normalized + 360) % 360;
-        const index = Math.floor(landedAngle / sectionSize);
-        const landed = sections[index];
-        setResult(landed);
+      let totalWin = 0;
+      let losses = {};
+      const landedColor = landed.name.toLowerCase();
 
-        let totalWin = 0;
-        let losses = {};
-        const landedColor = landed.name.toLowerCase();
-        
-        if (landedColor === "rojo" && bets.rojo > 0) {
-            totalWin = bets.rojo * landed.multiplier;
-        } else if (landedColor === "azul" && bets.azul > 0) {
-            totalWin = bets.azul * landed.multiplier;
-        } else if (landedColor === "blanco" && bets.blanco > 0) {
-            totalWin = bets.blanco * landed.multiplier;
-        }
+      if (landedColor === "rojo" && bets.rojo > 0)   totalWin = bets.rojo * landed.multiplier;
+      else if (landedColor === "azul" && bets.azul > 0)   totalWin = bets.azul * landed.multiplier;
+      else if (landedColor === "blanco" && bets.blanco > 0) totalWin = bets.blanco * landed.multiplier;
 
-        if (landedColor !== "rojo") losses.rojo = bets.rojo;
-        if (landedColor !== "azul") losses.azul = bets.azul;
-        if (landedColor !== "blanco") losses.blanco = bets.blanco;
-        if (landedColor === "negro") {
-            losses.rojo = bets.rojo;
-            losses.azul = bets.azul;
-            losses.blanco = bets.blanco;
-        }
+      if (landedColor !== "rojo")  losses.rojo = bets.rojo;
+      if (landedColor !== "azul")  losses.azul = bets.azul;
+      if (landedColor !== "blanco") losses.blanco = bets.blanco;
+      if (landedColor === "negro") { losses.rojo = bets.rojo; losses.azul = bets.azul; losses.blanco = bets.blanco; }
 
-        if (landed.name === "NEGRO") {
-          playLoseSound();
-          setToast({ text: "Cayó NEGRO 😢 Pierdes todas las apuestas", type: 'lose' });
-        } else if (totalWin > 0) {
-          setPlayerBalance((p) => Number((p + totalWin).toFixed(8)));
-          playWinSound();
-          setToast({ text: `✅ Ganaste ${totalWin.toFixed(0)} puntos en ${landed.name}!`, type: 'win' });
-        } else {
-          playLoseSound();
-          setToast({ text: "❌ Perdiste esta ronda.", type: 'lose' });
-        }
+      if (landed.name === "NEGRO") {
+        playLoseSound();
+        setToast({ text: "Cayó NEGRO 😢 Pierdes todas las apuestas", type: 'lose' });
+      } else if (totalWin > 0) {
+        setPlayerBalance((p) => Number((p + totalWin).toFixed(8)));
+        playWinSound();
+        setToast({ text: `✅ Ganaste ${totalWin.toFixed(0)} puntos en ${landed.name}!`, type: 'win' });
+      } else {
+        playLoseSound();
+        setToast({ text: "❌ Perdiste esta ronda.", type: 'lose' });
+      }
 
-        pushHistory(landed, bets, totalWin, losses);
-        setLightAnimationState('on');
+      pushHistory(landed, bets, totalWin, losses);
+      setLightAnimationState('on');
 
-        const tFinish = setTimeout(() => {
-          setSpinning(false);
-          setPlaneAction("idle");
-          setBets({ rojo: 0, azul: 0, blanco: 0 });
-          setIsRoundActive(false);
-          setLightAnimationState('idle');
-        }, LANDING_DUR + 200);
-        pushTimer(tFinish);
-      }, SPIN_DUR);
-      pushTimer(tEnd);
-    }, TAKEOFF_DUR);
-    pushTimer(tStartSpin);
+      const tFinish = setTimeout(() => {
+        setSpinning(false);
+        setBets({ rojo: 0, azul: 0, blanco: 0 });
+        setIsRoundActive(false);
+        setLightAnimationState('idle');
+      }, 1800);
+      pushTimer(tFinish);
+    }, SPIN_DUR);
+    pushTimer(tEnd);
   };
 
   const addBet = (color) => {
@@ -302,13 +283,6 @@ export default function ColorPlaneGame() {
   
   const clearBets = () => {
     setBets({ rojo: 0, azul: 0, blanco: 0 });
-  };
-
-  const planeVariants = {
-    idle: { y: -30, scale: 1, opacity: 1, rotate: 0 },
-    takeoff: { y: 200, scale: 1.4, opacity: 0, rotate: 20, transition: { duration: TAKEOFF_DUR / 1000, ease: "easeIn" } },
-    hiddenTop: { y: -420, scale: 0.7, opacity: 0, rotate: 20 },
-    landing: { y: -30, scale: 1, opacity: 1, rotate: 0, transition: { duration: LANDING_DUR / 1000, ease: "easeOut" } },
   };
 
   const lightVariants = {
@@ -498,88 +472,74 @@ export default function ColorPlaneGame() {
                   maxWidth: 400,
                 }}
               >
-                <motion.div
-                  animate={{ rotate: rotation }}
-                  transition={{ duration: SPIN_DUR / 1000, ease: "easeOut" }}
-                  style={{ width: "100%", aspectRatio: "1" }}
-                >
+                {/* Tablero fijo — el avión orbita alrededor */}
+                <div style={{ width: "100%", aspectRatio: "1" }}>
                   <canvas
                     ref={canvasRef}
                     width={radius * 2}
                     height={radius * 2}
                     style={{ width: "100%", height: "100%" }}
                   />
-                </motion.div>
+                </div>
+
+                {/* Luces decorativas */}
                 <motion.img
-                  id="rouletteLights"
                   src="/assets/roulette_lights_only.png"
-                  alt="Luces de Ruleta"
+                  alt="Luces"
                   variants={lightVariants}
                   animate={lightAnimationState}
                   transition={lightTransition}
                   initial="idle"
                   style={{
-                    position: "absolute",
-                    top: -20,
-                    left: -23,
-                    width: "111%",
-                    height: "111%",
-                    pointerEvents: "none",
-                    zIndex: 15,
+                    position: "absolute", top: -20, left: -23,
+                    width: "111%", height: "111%",
+                    pointerEvents: "none", zIndex: 15,
                   }}
                 />
-                <img
-                  src="/assets/flecha.png"
-                  alt="flecha"
+
+                {/* Contenedor orbital — rota y lleva al avión consigo */}
+                <motion.div
+                  animate={{ rotate: rotation }}
+                  transition={{ duration: SPIN_DUR / 1000, ease: "easeOut" }}
                   style={{
-                    position: "absolute",
-                    top: 35,
-                    left: "50%",
-                    transform: "translateX(-50%)",
-                    width: "60px",
-                    height: "auto",
-                    zIndex: 10,
-                    pointerEvents: "none",
+                    position: "absolute", top: 0, left: 0,
+                    width: "100%", height: "100%",
+                    pointerEvents: "none", zIndex: 20,
                   }}
-                />
-                <motion.img
-                  src="/assets/plane.png"
-                  variants={planeVariants}
-                  animate={planeAction}
-                  initial="idle"
-                  style={{
-                    position: "absolute",
-                    left: "37.4%",
-                    top: 1,
-                    transform: "translateX(-50%)",
-                    width: "25%",
-                    maxWidth: 120,
-                    pointerEvents: "none",
-                    zIndex: 20,
-                  }}
-                />
+                >
+                  {/* Avión en la cima del contenedor orbital */}
+                  <img
+                    src="/assets/plane.png"
+                    alt="avion"
+                    style={{
+                      position: "absolute",
+                      top: "-8%",
+                      left: "50%",
+                      transform: "translateX(-50%) rotate(180deg)",
+                      width: "22%",
+                      maxWidth: 90,
+                    }}
+                  />
+                </motion.div>
+
+                {/* Botón Apostar en el centro */}
                 <button
                   onClick={spin}
                   disabled={spinning || isRoundActive}
                   style={{
                     position: "absolute",
-                    top: "50.5%",
-                    left: "49.8%",
+                    top: "50%", left: "50%",
                     transform: "translate(-50%, -50%)",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    textAlign: "center",
+                    display: "flex", alignItems: "center",
+                    justifyContent: "center", textAlign: "center",
                     padding: "12px 30px",
-                    background: "#ffd54f",
+                    background: spinning ? "#aaa" : "#ffd54f",
                     borderRadius: "50%",
-                    height: "110px",
-                    width: "110px",
-                    fontWeight: "bold",
-                    fontSize: 18,
-                    border: "none",
-                    cursor: "pointer",
-                    zIndex: 20,
+                    height: "110px", width: "110px",
+                    fontWeight: "bold", fontSize: 18,
+                    border: "none", cursor: spinning ? "not-allowed" : "pointer",
+                    zIndex: 25,
+                    boxShadow: "0 4px 12px rgba(0,0,0,0.4)",
                   }}
                 >
                   {spinning ? "Girando..." : "Apostar"}
