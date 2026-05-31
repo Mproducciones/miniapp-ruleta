@@ -1,6 +1,7 @@
 import React, { useRef, useEffect, useState, useCallback, useMemo } from "react";
 import { MiniKit } from '@worldcoin/minikit-js';
 import { motion, AnimatePresence } from "framer-motion";
+import confetti from "canvas-confetti";
 import "./ColorPlaneGame.css";
 
 /* ===== GANCHO DE SONIDO ===== */
@@ -373,6 +374,7 @@ export default function ColorPlaneGame() {
         setScreenFlash({ color: landed.hex === '#ffffff' ? 'rgba(200,200,200,0.4)' : `${landed.hex}55`, key: Date.now() });
         setLastWin({ amount: totalWin, color: landed.hex, name: landed.name, won: true });
         setToast({ text: `✅ Ganaste ${totalWin.toFixed(0)} fichas en ${landed.name}!`, type: 'win' });
+        confetti({ particleCount: 130, spread: 75, origin: { y: 0.45 }, colors: [landed.hex, '#ffd700', '#ffffff'] });
       } else {
         playLoseSound();
         triggerBurst("#444");
@@ -457,9 +459,17 @@ export default function ColorPlaneGame() {
   /* ============================================================
      RENDER
      ============================================================ */
+  /* ---- Light variants ---- */
+  const lightVariants2 = {
+    idle:    { opacity: 0.75, filter: 'brightness(0.65)' },
+    on:      { opacity: 1,    filter: 'brightness(1.25)' },
+    flicker: { opacity: [1,0.6,1], filter: ['brightness(1.6)','brightness(0.9)','brightness(1.6)'],
+               transition: { duration: 0.3, repeat: Infinity, repeatType:'loop' } },
+  };
+
   return (
     <div
-      className="carnival-bg"
+      className="game-root"
       style={{
         minHeight: "100vh",
         display: "flex",
