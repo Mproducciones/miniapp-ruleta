@@ -244,6 +244,39 @@ export default function ColorPlaneGame() {
     ctx.stroke();
   }, [radius]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  /* ---- Highlight winning section on canvas ---- */
+  const highlightSection = useCallback((index) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    const cx = radius, cy = radius;
+    const sectionAngle = (2 * Math.PI) / sections.length;
+    const startAngle = index * sectionAngle;
+    const endAngle   = startAngle + sectionAngle;
+    const { r, g, b } = hexToRgb(sections[index].hex);
+    const glowColor = `rgba(${r},${g},${b},0.9)`;
+
+    // Pulsing glow arc on the winning slice
+    ctx.save();
+    ctx.shadowColor = glowColor;
+    ctx.shadowBlur  = 30;
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.arc(cx, cy, radius - 6, startAngle, endAngle);
+    ctx.closePath();
+    ctx.strokeStyle = "#ffffff";
+    ctx.lineWidth   = 5;
+    ctx.stroke();
+
+    // Bright outer arc
+    ctx.beginPath();
+    ctx.arc(cx, cy, radius - 8, startAngle, endAngle);
+    ctx.strokeStyle = glowColor;
+    ctx.lineWidth   = 6;
+    ctx.stroke();
+    ctx.restore();
+  }, [radius]);
+
   useEffect(() => { drawWheel(); }, [drawWheel]);
 
   useEffect(() => {
@@ -294,6 +327,7 @@ export default function ColorPlaneGame() {
     setLastBets(bets);
     setLightAnimationState('flicker');
     playSpinSound();
+    drawWheel(); // Limpiar highlight del giro anterior
 
     const randomRotation = 360 * 7 + Math.floor(Math.random() * 360);
     const final = rotation + randomRotation;
@@ -302,10 +336,16 @@ export default function ColorPlaneGame() {
     const tEnd = setTimeout(() => {
       const normalized = (final % 360 + 360) % 360;
       const sectionSize = 360 / sections.length;
+      // rotate(0deg) = nariz hacia adentro = apunta directamente a la sección bajo el cuerpo del avión
+      // El avión en 12 en punto → canvas 270° → sección 10. Al rotar N° → canvas (270+N)%360
       const canvasAngle = (270 + normalized) % 360;
       const index       = Math.floor(canvasAngle / sectionSize) % sections.length;
       const landed      = sections[index];
       setResult(landed);
+
+      // Resaltar la sección ganadora en el canvas
+      drawWheel();
+      setTimeout(() => highlightSection(index), 50);
 
       let totalWin = 0;
       let losses   = {};
@@ -677,7 +717,7 @@ export default function ColorPlaneGame() {
                   alt="avion"
                   style={{
                     position: "absolute", top: "-8%", left: "50%",
-                    transform: "translateX(-50%) rotate(-90deg)",
+                    transform: "translateX(-50%) rotate(0deg)",
                     width: "22%", maxWidth: 90,
                     filter: spinning
                       ? "drop-shadow(0 0 8px rgba(255,220,0,0.95)) drop-shadow(0 0 22px rgba(255,100,0,0.7))"
