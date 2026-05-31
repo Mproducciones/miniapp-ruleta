@@ -508,6 +508,7 @@ export default function ColorPlaneGame() {
                   }}
                 >
                   {/* Avión en la cima del contenedor orbital */}
+                  {/* rotate(-90deg): la punta apunta hacia la derecha = sentido horario cuando está en 12 en punto */}
                   <img
                     src="/assets/plane.png"
                     alt="avion"
@@ -515,7 +516,7 @@ export default function ColorPlaneGame() {
                       position: "absolute",
                       top: "-8%",
                       left: "50%",
-                      transform: "translateX(-50%) rotate(180deg)",
+                      transform: "translateX(-50%) rotate(-90deg)",
                       width: "22%",
                       maxWidth: 90,
                     }}
