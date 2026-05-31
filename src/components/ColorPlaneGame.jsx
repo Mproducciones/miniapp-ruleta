@@ -88,6 +88,7 @@ export default function ColorPlaneGame() {
 
   /* ---- UI state ---- */
   const [isVerified,  setIsVerified]  = useState(false);
+  const inWorldApp = useMemo(() => MiniKit.isInstalled(), []);
   const [toast,       setToast]       = useState(null);
   const [screenFlash, setScreenFlash] = useState(null);
   const [burstParticles, setBurstParticles] = useState([]);
@@ -434,7 +435,7 @@ export default function ColorPlaneGame() {
       setToast({ text: `+${pkg.amount} fichas añadidas!`, type: 'win' });
       return;
     }
-    if (MiniKit.isInstalled()) {
+    if (inWorldApp) {
       try {
         await MiniKit.pay({
           to: PAYMENT_ADDRESS,
@@ -556,7 +557,7 @@ export default function ColorPlaneGame() {
           style={{ zIndex: 2 }}
         >
           <div className="verify-title">¡Bienvenido! 👋</div>
-          {MiniKit.isInstalled() ? (
+          {inWorldApp ? (
             <>
               <p style={{ color: '#ccc', marginBottom: '20px', fontSize: 14 }}>
                 Verifica tu identidad con World ID para jugar.
@@ -1068,7 +1069,7 @@ export default function ColorPlaneGame() {
                   </motion.div>
                 ))}
 
-                {!MiniKit.isInstalled() && (
+                {!inWorldApp && (
                   <p style={{ color: "rgba(255,255,255,0.38)", fontSize: 12, textAlign: "center", marginTop: 14 }}>
                     Abre en World App para pagos reales con WLD.
                   </p>
