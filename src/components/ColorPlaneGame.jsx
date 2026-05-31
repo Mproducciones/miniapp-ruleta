@@ -1,5 +1,5 @@
 ﻿import React, { useRef, useEffect, useState, useCallback } from "react";
-import { IDKitWidget } from '@worldcoin/idkit';
+import { MiniKit } from '@worldcoin/minikit-js';
 import { motion } from "framer-motion";
 import "./ColorPlaneGame.css";
 
@@ -426,43 +426,58 @@ export default function ColorPlaneGame() {
       {!isVerified ? (
         <div style={{ padding: '20px', textAlign: 'center', marginTop: 50, background: 'rgba(0,0,0,0.5)', borderRadius: '12px', boxShadow: '0 4px 10px rgba(0,0,0,0.3)' }}>
           <h2 style={{ color: '#fff', fontSize: '24px' }}>¡Bienvenido! 👋</h2>
-          <p style={{ color: '#ddd', marginBottom: '20px' }}>Para empezar a jugar, conéctate con World ID.</p>
-          <IDKitWidget
-            app_id="app_0421a6be5285baa95f9b59b01e75d91c"
-            action="Ruleta game Coins"
-            handleVerify={async (result) => {
-              const response = await fetch(`${API_URL}/api/verify`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(result),
-              });
-              if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.detail || "Verificación fallida en el servidor");
+          <p style={{ color: '#ddd', marginBottom: '20px' }}>Para empezar a jugar, verifica tu identidad con World ID.</p>
+          <button
+            onClick={async () => {
+              if (!MiniKit.isInstalled()) {
+                setToast({ text: 'Abre esta app dentro de World App para verificar.', type: 'info' });
+                return;
+              }
+              try {
+                const nonceRes = await fetch(`${API_URL}/api/nonce`);
+                const { nonce } = await nonceRes.json();
+
+                const result = await MiniKit.walletAuth({
+                  nonce,
+                  statement: 'Verifica tu identidad para jugar a Avión de Colores',
+                });
+
+                if (result.data?.status === 'error') {
+                  setToast({ text: 'Verificación cancelada.', type: 'lose' });
+                  return;
+                }
+
+                const res = await fetch(`${API_URL}/api/verify`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    payload: result.data,
+                    nonce,
+                  }),
+                });
+                const data = await res.json();
+                if (res.ok && data.ok) {
+                  setIsVerified(true);
+                } else {
+                  setToast({ text: data.message || 'Verificación fallida.', type: 'lose' });
+                }
+              } catch (err) {
+                setToast({ text: 'Error al verificar. Inténtalo de nuevo.', type: 'lose' });
               }
             }}
-            onSuccess={() => {
-              setIsVerified(true);
+            style={{
+              padding: '12px 24px',
+              background: '#1c74d6',
+              color: 'white',
+              border: 'none',
+              borderRadius: '8px',
+              cursor: 'pointer',
+              fontSize: '16px',
+              fontWeight: 'bold',
             }}
           >
-            {({ open }) => (
-              <button
-                onClick={open}
-                style={{
-                  padding: '12px 24px',
-                  background: '#1c74d6',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '8px',
-                  cursor: 'pointer',
-                  fontSize: '16px',
-                  fontWeight: 'bold',
-                }}
-              >
-                Verificar con World ID
-              </button>
-            )}
-          </IDKitWidget>
+            Verificar con World ID
+          </button>
         </div>
       ) : (
         <>
