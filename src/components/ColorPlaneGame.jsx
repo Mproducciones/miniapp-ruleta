@@ -462,7 +462,8 @@ export default function ColorPlaneGame() {
                   setToast({ text: data.message || 'Verificación fallida.', type: 'lose' });
                 }
               } catch (err) {
-                setToast({ text: 'Error al verificar. Inténtalo de nuevo.', type: 'lose' });
+                console.error('Verify error:', err);
+                setToast({ text: `Error: ${err.message || 'Inténtalo de nuevo.'}`, type: 'lose' });
               }
             }}
             style={{

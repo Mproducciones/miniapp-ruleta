@@ -1,4 +1,4 @@
-import { verifySiweMessage } from "@worldcoin/minikit-js/siwe-exports";
+import { parseSiweMessage } from "@worldcoin/minikit-js/siwe-exports";
 
 export default async function handler(req, res) {
   if (req.method !== "POST") {
@@ -12,15 +12,28 @@ export default async function handler(req, res) {
   }
 
   try {
-    const validMessage = await verifySiweMessage(payload, nonce);
+    // payload.message es el string SIWE firmado por World App
+    const message = payload.message || payload.siwe_message || payload;
 
-    if (!validMessage.isValid) {
-      return res.status(400).json({ ok: false, message: "Firma SIWE inválida" });
+    if (!message) {
+      return res.status(400).json({ ok: false, message: "No se encontró el mensaje SIWE" });
     }
 
-    return res.status(200).json({ ok: true, address: validMessage.siweMessageData.address });
+    const parsed = parseSiweMessage(typeof message === "string" ? message : JSON.stringify(message));
+
+    // Verificar que el nonce en el mensaje coincide con el nonce emitido
+    if (parsed.nonce !== nonce) {
+      return res.status(400).json({ ok: false, message: "Nonce inválido" });
+    }
+
+    // Verificar que el mensaje no está expirado (si tiene expiration)
+    if (parsed.expirationTime && new Date(parsed.expirationTime) < new Date()) {
+      return res.status(400).json({ ok: false, message: "Mensaje expirado" });
+    }
+
+    return res.status(200).json({ ok: true, address: parsed.address });
   } catch (error) {
-    console.error("Error verifying SIWE:", error);
-    return res.status(500).json({ ok: false, message: "Error al verificar la firma" });
+    console.error("Error parsing SIWE message:", error);
+    return res.status(500).json({ ok: false, message: "Error al procesar la verificación: " + error.message });
   }
 }
