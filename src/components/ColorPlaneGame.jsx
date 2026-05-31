@@ -1,4 +1,4 @@
-﻿import React, { useRef, useEffect, useState, useCallback } from "react";
+﻿import React, { useRef, useEffect, useState, useCallback, useMemo } from "react";
 import { MiniKit } from '@worldcoin/minikit-js';
 import { motion } from "framer-motion";
 import "./ColorPlaneGame.css";
@@ -54,15 +54,18 @@ const sections = [
   { hex: "#0066ff", name: "AZUL", multiplier: 2 },
 ];
 
+/* ===== COLOR HELPERS ===== */
+const hexToRgb = (hex) => {
+  const r = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+  return r ? { r: parseInt(r[1],16), g: parseInt(r[2],16), b: parseInt(r[3],16) } : {r:0,g:0,b:0};
+};
+
 export default function ColorPlaneGame() {
   const canvasRef = useRef(null);
   const timersRef = useRef([]);
   const pushTimer = (t) => timersRef.current.push(t);
 
-  const TAKEOFF_DUR = 1200;
   const SPIN_DUR = 4200;
-  const LANDING_APPEAR_BEFORE_STOP = 2000;
-  const LANDING_DUR = 1000;
 
   const [rotation, setRotation] = useState(0);
   const [spinning, setSpinning] = useState(false);
@@ -78,7 +81,32 @@ export default function ColorPlaneGame() {
   const radius = 160;
 
   const [isVerified, setIsVerified] = useState(false);
-  const [toast, setToast] = useState(null); // { text, type: 'win'|'lose'|'info' }
+  const [toast, setToast] = useState(null);
+  const [screenFlash, setScreenFlash] = useState(null);
+  const [burstParticles, setBurstParticles] = useState([]);
+
+  // Starfield — generated once
+  const stars = useMemo(() => Array.from({ length: 50 }, (_, i) => ({
+    id: i,
+    left: Math.random() * 100,
+    top: Math.random() * 100,
+    size: Math.random() * 2.5 + 0.5,
+    delay: Math.random() * 6,
+    dur: Math.random() * 3 + 2,
+    op: Math.random() * 0.5 + 0.2,
+  })), []);
+
+  const triggerBurst = useCallback((color) => {
+    const count = 22;
+    setBurstParticles(Array.from({ length: count }, (_, i) => ({
+      id: Date.now() + i,
+      angle: (360 / count) * i + Math.random() * 8,
+      dist: 55 + Math.random() * 70,
+      size: Math.random() * 9 + 4,
+      color,
+    })));
+    setTimeout(() => setBurstParticles([]), 1100);
+  }, []);
 
   const playSpinSound = useSound('/sounds/spin.mp3');
   const playWinSound = useSound('/sounds/win.mp3');
@@ -115,42 +143,93 @@ export default function ColorPlaneGame() {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
+    const cx = radius, cy = radius;
     const sectionAngle = (2 * Math.PI) / sections.length;
     ctx.clearRect(0, 0, canvas.width, canvas.height);
+
     sections.forEach((sec, i) => {
       const startAngle = i * sectionAngle;
       const endAngle = startAngle + sectionAngle;
-      ctx.beginPath();
-      ctx.moveTo(radius, radius);
-      ctx.arc(radius, radius, radius, startAngle, endAngle);
-      ctx.closePath();
-      ctx.fillStyle = sec.hex;
-      ctx.fill();
-      ctx.strokeStyle = "#222";
-      ctx.stroke();
       const midAngle = startAngle + sectionAngle / 2;
-      const textRadius = radius * 0.6;
-      const x = radius + textRadius * Math.cos(midAngle);
-      const y = radius + textRadius * Math.sin(midAngle);
+      const { r, g, b } = hexToRgb(sec.hex);
+
+      // Gradient from lighter center to darker edge
+      const grad = ctx.createLinearGradient(
+        cx + (radius * 0.25) * Math.cos(midAngle), cy + (radius * 0.25) * Math.sin(midAngle),
+        cx + radius * Math.cos(midAngle), cy + radius * Math.sin(midAngle)
+      );
+      grad.addColorStop(0, `rgba(${Math.min(255,r+70)},${Math.min(255,g+70)},${Math.min(255,b+70)},1)`);
+      grad.addColorStop(1, `rgba(${Math.max(0,r-40)},${Math.max(0,g-40)},${Math.max(0,b-40)},1)`);
+
+      ctx.beginPath();
+      ctx.moveTo(cx, cy);
+      ctx.arc(cx, cy, radius - 6, startAngle, endAngle);
+      ctx.closePath();
+      ctx.fillStyle = grad;
+      ctx.fill();
+      ctx.strokeStyle = "rgba(0,0,0,0.5)";
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+
+      // Multiplier text with glow
+      const tx = cx + radius * 0.66 * Math.cos(midAngle);
+      const ty = cy + radius * 0.66 * Math.sin(midAngle);
       ctx.save();
-      ctx.translate(x, y);
+      ctx.translate(tx, ty);
       ctx.rotate(midAngle + Math.PI / 2);
+      const isWhite = sec.hex === "#ffffff";
+      ctx.fillStyle = isWhite ? "#111" : "#fff";
+      ctx.shadowColor = isWhite ? "rgba(0,0,0,0.6)" : `rgba(${r},${g},${b},0.9)`;
+      ctx.shadowBlur = 10;
+      ctx.font = "bold 16px Arial";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
       if (sec.multiplier > 0) {
-        ctx.fillStyle = sec.hex === "#ffffff" ? "#222" : "#fff";
-        ctx.font = "bold 18px Arial";
-        ctx.textAlign = "center";
-        ctx.textBaseline = "middle";
         ctx.fillText(`x${sec.multiplier}`, 0, 0);
       } else {
-        ctx.fillStyle = "#fff";
-        ctx.font = "bold 12px Arial";
-        ctx.textAlign = "center";
-        ctx.textBaseline = "middle";
-        wrapText(ctx, "PIERDE TODO", 0, 0, 80, 16);
+        ctx.font = "bold 9px Arial";
+        ctx.fillText("PIERDE", 0, -6);
+        ctx.fillText("TODO", 0, 6);
       }
       ctx.restore();
     });
-  }, [radius, sections, wrapText]);
+
+    // Glossy shine overlay (top-left lighter)
+    const gloss = ctx.createRadialGradient(cx * 0.65, cy * 0.45, 0, cx, cy, radius);
+    gloss.addColorStop(0, "rgba(255,255,255,0.22)");
+    gloss.addColorStop(0.45, "rgba(255,255,255,0.04)");
+    gloss.addColorStop(1, "rgba(0,0,0,0.18)");
+    ctx.beginPath();
+    ctx.arc(cx, cy, radius - 6, 0, Math.PI * 2);
+    ctx.fillStyle = gloss;
+    ctx.fill();
+
+    // Metallic outer ring
+    const ringGrad = ctx.createLinearGradient(0, 0, radius * 2, radius * 2);
+    ringGrad.addColorStop(0, "rgba(255,255,255,0.95)");
+    ringGrad.addColorStop(0.35, "rgba(160,160,160,0.7)");
+    ringGrad.addColorStop(0.65, "rgba(80,80,80,0.9)");
+    ringGrad.addColorStop(1, "rgba(220,220,220,0.8)");
+    ctx.beginPath();
+    ctx.arc(cx, cy, radius - 3, 0, Math.PI * 2);
+    ctx.strokeStyle = ringGrad;
+    ctx.lineWidth = 7;
+    ctx.stroke();
+
+    // Center hub — metallic button
+    const hubGrad = ctx.createRadialGradient(cx - 7, cy - 7, 1, cx, cy, 30);
+    hubGrad.addColorStop(0, "#ffffff");
+    hubGrad.addColorStop(0.3, "#dddddd");
+    hubGrad.addColorStop(0.7, "#999999");
+    hubGrad.addColorStop(1, "#666666");
+    ctx.beginPath();
+    ctx.arc(cx, cy, 28, 0, Math.PI * 2);
+    ctx.fillStyle = hubGrad;
+    ctx.fill();
+    ctx.strokeStyle = "rgba(255,255,255,0.6)";
+    ctx.lineWidth = 2;
+    ctx.stroke();
+  }, [radius, sections]);
 
   useEffect(() => {
     drawWheel();
@@ -224,13 +303,19 @@ export default function ColorPlaneGame() {
 
       if (landed.name === "NEGRO") {
         playLoseSound();
+        triggerBurst("#333333");
+        setScreenFlash({ color: "rgba(80,0,0,0.6)", key: Date.now() });
         setToast({ text: "Cayó NEGRO 😢 Pierdes todas las apuestas", type: 'lose' });
       } else if (totalWin > 0) {
         setPlayerBalance((p) => Number((p + totalWin).toFixed(8)));
         playWinSound();
-        setToast({ text: `✅ Ganaste ${totalWin.toFixed(0)} puntos en ${landed.name}!`, type: 'win' });
+        triggerBurst(landed.hex);
+        setScreenFlash({ color: landed.hex === '#ffffff' ? 'rgba(200,200,200,0.4)' : `${landed.hex}55`, key: Date.now() });
+        setToast({ text: `✅ Ganaste ${totalWin.toFixed(0)} pts en ${landed.name}!`, type: 'win' });
       } else {
         playLoseSound();
+        triggerBurst("#444");
+        setScreenFlash({ color: "rgba(60,0,0,0.5)", key: Date.now() });
         setToast({ text: "❌ Perdiste esta ronda.", type: 'lose' });
       }
 
@@ -379,23 +464,19 @@ export default function ColorPlaneGame() {
   };
 
   return (
-    <div
-      style={{
-        minHeight: "100vh",
-        backgroundImage: "url(/assets/background.jpg)",
-        backgroundSize: "cover",
-        backgroundPosition: "center",
-        padding: 20,
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-      }}
-    >
-      <img
-        src="/assets/logo.png"
-        alt="logo"
-        style={{ width: "90%", maxWidth: 350, marginTop: 8 }}
-      />
+    <div style={{ minHeight: "100vh", background: "radial-gradient(ellipse at top, #0d0d2b 0%, #030310 60%)", padding: "16px 16px 32px", display: "flex", flexDirection: "column", alignItems: "center", position: "relative", overflow: "hidden" }}>
+
+      {/* Starfield */}
+      {stars.map(s => (
+        <div key={s.id} className="star" style={{ left: `${s.left}%`, top: `${s.top}%`, width: s.size, height: s.size, '--dur': `${s.dur}s`, '--delay': `${s.delay}s`, '--base-op': s.op }} />
+      ))}
+
+      {/* Screen flash overlay */}
+      {screenFlash && (
+        <div key={screenFlash.key} className="screen-flash" style={{ background: `radial-gradient(circle, ${screenFlash.color} 0%, transparent 70%)` }} />
+      )}
+
+      <img src="/assets/logo.png" alt="logo" style={{ width: "85%", maxWidth: 320, marginTop: 8, position: "relative", zIndex: 2, filter: "drop-shadow(0 0 12px rgba(255,200,0,0.5))" }} />
 
       {!isVerified ? (
         <div style={{ padding: '20px', textAlign: 'center', marginTop: 50, background: 'rgba(0,0,0,0.5)', borderRadius: '12px', boxShadow: '0 4px 10px rgba(0,0,0,0.3)' }}>
@@ -464,242 +545,154 @@ export default function ColorPlaneGame() {
         <>
           {view === "game" && (
             <>
-              <div
-                style={{
-                  position: "relative",
-                  marginTop: 20,
-                  width: "90%",
-                  maxWidth: 400,
-                }}
-              >
-                {/* Tablero fijo — el avión orbita alrededor */}
-                <div style={{ width: "100%", aspectRatio: "1" }}>
-                  <canvas
-                    ref={canvasRef}
-                    width={radius * 2}
-                    height={radius * 2}
-                    style={{ width: "100%", height: "100%" }}
-                  />
-                </div>
-
-                {/* Luces decorativas */}
-                <motion.img
-                  src="/assets/roulette_lights_only.png"
-                  alt="Luces"
-                  variants={lightVariants}
-                  animate={lightAnimationState}
-                  transition={lightTransition}
-                  initial="idle"
-                  style={{
-                    position: "absolute", top: -20, left: -23,
-                    width: "111%", height: "111%",
-                    pointerEvents: "none", zIndex: 15,
-                  }}
-                />
-
-                {/* Contenedor orbital — rota y lleva al avión consigo */}
+              {/* ===== WHEEL SECTION ===== */}
+              <div style={{ perspective: "900px", marginTop: 12, width: "92%", maxWidth: 390, zIndex: 2, position: "relative" }}>
                 <motion.div
-                  animate={{ rotate: rotation }}
-                  transition={{ duration: SPIN_DUR / 1000, ease: "easeOut" }}
-                  style={{
-                    position: "absolute", top: 0, left: 0,
-                    width: "100%", height: "100%",
-                    pointerEvents: "none", zIndex: 20,
-                  }}
+                  animate={{ rotateX: spinning ? 14 : 0, scale: spinning ? 1.04 : 1 }}
+                  transition={{ duration: 0.6, ease: "easeOut" }}
+                  style={{ transformStyle: "preserve-3d", position: "relative" }}
                 >
-                  {/* Avión en la cima del contenedor orbital */}
-                  {/* rotate(-90deg): la punta apunta hacia la derecha = sentido horario cuando está en 12 en punto */}
-                  <img
-                    src="/assets/plane.png"
-                    alt="avion"
-                    style={{
-                      position: "absolute",
-                      top: "-8%",
-                      left: "50%",
-                      transform: "translateX(-50%) rotate(-90deg)",
-                      width: "22%",
-                      maxWidth: 90,
-                    }}
-                  />
-                </motion.div>
+                  {/* Rainbow neon ring */}
+                  <div className={`wheel-ring${spinning ? " spinning" : ""}`} />
 
-                {/* Botón Apostar en el centro */}
-                <button
-                  onClick={spin}
-                  disabled={spinning || isRoundActive}
-                  style={{
-                    position: "absolute",
-                    top: "50%", left: "50%",
-                    transform: "translate(-50%, -50%)",
-                    display: "flex", alignItems: "center",
-                    justifyContent: "center", textAlign: "center",
-                    padding: "12px 30px",
-                    background: spinning ? "#aaa" : "#ffd54f",
-                    borderRadius: "50%",
-                    height: "110px", width: "110px",
-                    fontWeight: "bold", fontSize: 18,
-                    border: "none", cursor: spinning ? "not-allowed" : "pointer",
-                    zIndex: 25,
-                    boxShadow: "0 4px 12px rgba(0,0,0,0.4)",
-                  }}
-                >
-                  {spinning ? "Girando..." : "Apostar"}
-                </button>
-              </div>
-              <div style={{ marginTop: 20, display: "flex", gap: 10 }}>
-                {[10, 50, 100].map((val) => (
-                  <button
-                    key={val}
-                    onClick={() => setChipValue(val)}
-                    style={{
-                      padding: "8px 14px",
-                      borderRadius: 8,
-                      background: chipValue === val ? "#ffd54f" : "#eee",
-                      fontWeight: chipValue === val ? "bold" : "normal",
-                    }}
+                  {/* Speed rings during spin */}
+                  {spinning && [0,1,2].map(i => (
+                    <div key={i} className="speed-ring" style={{ '--delay': `${i * 0.38}s` }} />
+                  ))}
+
+                  {/* Fixed canvas wheel with glow */}
+                  <div style={{
+                    width: "100%", aspectRatio: "1",
+                    filter: spinning
+                      ? "drop-shadow(0 0 18px rgba(255,200,0,0.75)) drop-shadow(0 0 45px rgba(255,100,0,0.45))"
+                      : "drop-shadow(0 0 6px rgba(255,200,0,0.2))",
+                    transition: "filter 0.6s",
+                  }}>
+                    <canvas ref={canvasRef} width={radius * 2} height={radius * 2} style={{ width: "100%", height: "100%" }} />
+                  </div>
+
+                  {/* Roulette lights */}
+                  <motion.img
+                    src="/assets/roulette_lights_only.png" alt="Luces"
+                    variants={lightVariants} animate={lightAnimationState}
+                    transition={lightTransition} initial="idle"
+                    style={{ position: "absolute", top: -20, left: -23, width: "111%", height: "111%", pointerEvents: "none", zIndex: 15 }}
+                  />
+
+                  {/* Particle burst */}
+                  <div style={{ position: "absolute", inset: 0, pointerEvents: "none", zIndex: 30 }}>
+                    {burstParticles.map(p => (
+                      <div key={p.id} className="burst-particle" style={{
+                        width: p.size, height: p.size,
+                        background: p.color,
+                        boxShadow: `0 0 ${p.size * 2}px ${p.color}, 0 0 ${p.size * 4}px ${p.color}55`,
+                        '--tx': `${Math.cos(p.angle * Math.PI / 180) * p.dist}px`,
+                        '--ty': `${Math.sin(p.angle * Math.PI / 180) * p.dist}px`,
+                      }} />
+                    ))}
+                  </div>
+
+                  {/* Orbital container — carries the plane */}
+                  <motion.div
+                    animate={{ rotate: rotation }}
+                    transition={{ duration: SPIN_DUR / 1000, ease: "easeOut" }}
+                    style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "100%", pointerEvents: "none", zIndex: 20 }}
                   >
-                    {val} Pts
+                    {/* Comet trail when spinning */}
+                    {spinning && (
+                      <div className="plane-trail" style={{ position: "absolute", top: "5%", left: "calc(50% - 2px)", transformOrigin: "center bottom" }} />
+                    )}
+                    {/* Plane */}
+                    <img
+                      src="/assets/plane.png" alt="avion"
+                      style={{
+                        position: "absolute", top: "-8%", left: "50%",
+                        transform: "translateX(-50%) rotate(-90deg)",
+                        width: "22%", maxWidth: 90,
+                        filter: spinning
+                          ? "drop-shadow(0 0 8px rgba(255,220,0,0.95)) drop-shadow(0 0 22px rgba(255,100,0,0.7))"
+                          : "drop-shadow(0 0 4px rgba(255,200,0,0.4))",
+                        transition: "filter 0.4s",
+                      }}
+                    />
+                  </motion.div>
+
+                  {/* Center spin button */}
+                  <button
+                    onClick={spin}
+                    disabled={spinning || isRoundActive}
+                    className={`spin-btn ${spinning ? "spinning" : "idle"}`}
+                  >
+                    {spinning ? "..." : "GIRAR"}
+                  </button>
+                </motion.div>
+              </div>
+
+              {/* ===== HUD BALANCE ===== */}
+              <div style={{ marginTop: 14, textAlign: "center", zIndex: 2 }}>
+                <div style={{ fontSize: 11, color: "rgba(255,230,100,0.6)", letterSpacing: 3, textTransform: "uppercase", marginBottom: 2 }}>Saldo</div>
+                <div className="hud-balance">{playerBalance.toFixed(0)} <span style={{ fontSize: 14 }}>PTS</span></div>
+              </div>
+
+              {/* ===== CHIP SELECTOR ===== */}
+              <div className="chip-selector" style={{ display: "flex", gap: 8, marginTop: 14, zIndex: 2 }}>
+                {[10, 50, 100].map(val => (
+                  <button key={val} className={chipValue === val ? "active" : ""} onClick={() => setChipValue(val)}>
+                    {val} pts
                   </button>
                 ))}
               </div>
-              <div
-                style={{
-                  marginTop: 20,
-                  display: "flex",
-                  gap: 10,
-                  flexWrap: "wrap",
-                  justifyContent: "center",
-                }}
-              >
+
+              {/* ===== BET CHIPS ===== */}
+              <div style={{ display: "flex", gap: 14, marginTop: 14, zIndex: 2 }}>
                 <motion.button
+                  className="chip-btn chip-red"
                   onClick={() => addBet("rojo")}
-                  whileTap={{ scale: 0.9, y: 3, boxShadow: "0 2px 4px rgba(0,0,0,0.4)" }}
+                  whileTap={{ scale: 0.88, y: 4 }}
                   disabled={spinning}
-                  style={{
-                    width: 90,
-                    height: 90,
-                    borderRadius: "50%",
-                    background: "linear-gradient(#ff3b30, #cc0000)",
-                    color: "#fff",
-                    display: "flex",
-                    flexDirection: "column",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    boxShadow: "0 4px 6px rgba(0,0,0,0.3)",
-                    border: "none",
-                    fontSize: 14,
-                    fontWeight: "bold",
-                  }}
                 >
                   <span>ROJO</span>
-                  <span>x1.5</span>
-                  <small>({bets.rojo.toFixed(0)})</small>
+                  <span style={{ fontSize: 12 }}>x1.5</span>
+                  <span className="bet-badge">{bets.rojo > 0 ? `+${bets.rojo}` : "—"}</span>
                 </motion.button>
+
                 <motion.button
+                  className="chip-btn chip-blue"
                   onClick={() => addBet("azul")}
-                  whileTap={{ scale: 0.9, y: 3, boxShadow: "0 2px 4px rgba(0,0,0,0.4)" }}
+                  whileTap={{ scale: 0.88, y: 4 }}
                   disabled={spinning}
-                  style={{
-                    width: 90,
-                    height: 90,
-                    borderRadius: "50%",
-                    background: "linear-gradient(#0066ff, #0033cc)",
-                    color: "#fff",
-                    display: "flex",
-                    flexDirection: "column",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    boxShadow: "0 4px 6px rgba(0,0,0,0.3)",
-                    border: "none",
-                    fontSize: 14,
-                    fontWeight: "bold",
-                  }}
                 >
                   <span>AZUL</span>
-                  <span>x2</span>
-                  <small>({bets.azul.toFixed(0)})</small>
+                  <span style={{ fontSize: 12 }}>x2</span>
+                  <span className="bet-badge">{bets.azul > 0 ? `+${bets.azul}` : "—"}</span>
                 </motion.button>
+
                 <motion.button
+                  className="chip-btn chip-white"
                   onClick={() => addBet("blanco")}
-                  whileTap={{ scale: 0.9, y: 3, boxShadow: "0 2px 4px rgba(0,0,0,0.4)" }}
+                  whileTap={{ scale: 0.88, y: 4 }}
                   disabled={spinning}
-                  style={{
-                    width: 90,
-                    height: 90,
-                    borderRadius: "50%",
-                    background: "linear-gradient(#ffffff, #e0e0e0)",
-                    color: "#111",
-                    display: "flex",
-                    flexDirection: "column",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    boxShadow: "0 4px 6px rgba(0,0,0,0.3)",
-                    border: "1px solid #ccc",
-                    fontSize: 14,
-                    fontWeight: "bold",
-                  }}
                 >
                   <span>BLANCO</span>
-                  <span>x3</span>
-                  <small>({bets.blanco.toFixed(0)})</small>
+                  <span style={{ fontSize: 12 }}>x3</span>
+                  <span className="bet-badge">{bets.blanco > 0 ? `+${bets.blanco}` : "—"}</span>
                 </motion.button>
               </div>
-              <div style={{ marginTop: 12, display: "flex", gap: 10 }}>
-                <motion.button
-                  onClick={repeatBet}
-                  whileTap={{ scale: 0.9, y: 3, boxShadow: "0 2px 4px rgba(0,0,0,0.4)" }}
-                  disabled={spinning}
-                  style={{ padding: "8px 14px", borderRadius: 8 }}
-                >
-                  🔄 Repetir
-                </motion.button>
-                <motion.button
-                  onClick={doubleBet}
-                  whileTap={{ scale: 0.9, y: 3, boxShadow: "0 2px 4px rgba(0,0,0,0.4)" }}
-                  disabled={spinning}
-                  style={{ padding: "8px 14px", borderRadius: 8 }}
-                >
-                  ✖2 Doblar
-                </motion.button>
-                <motion.button
-                  onClick={clearBets}
-                  whileTap={{ scale: 0.9, y: 3, boxShadow: "0 2px 4px rgba(0,0,0,0.4)" }}
-                  disabled={spinning}
-                  style={{ padding: "8px 14px", borderRadius: 8 }}
-                >
-                  Cero Apuestas
-                </motion.button>
+
+              {/* ===== CONTROL BUTTONS ===== */}
+              <div style={{ display: "flex", gap: 8, marginTop: 12, zIndex: 2 }}>
+                <button className="ctrl-btn" onClick={repeatBet} disabled={spinning}>🔄 Repetir</button>
+                <button className="ctrl-btn" onClick={doubleBet} disabled={spinning}>✖2 Doblar</button>
+                <button className="ctrl-btn" onClick={clearBets} disabled={spinning}>✕ Cero</button>
               </div>
-              <div style={{ marginTop: 12, fontSize: 14, color: "#ddd" }}>
-                Saldo jugador: {playerBalance.toFixed(0)} puntos
-              </div>
-              <div
-                style={{
-                  marginTop: 24,
-                  display: "flex",
-                  gap: 6,
-                  flexWrap: "wrap",
-                  justifyContent: "center",
-                }}
-              >
-                {history.length === 0 && (
-                  <p style={{ color: "#eee" }}>Aún no hay resultados</p>
-                )}
-                {!isRoundActive &&
-                  history.map((h, i) => (
-                    <div
-                      key={i}
-                      onClick={() => setView("historial")}
-                      style={{
-                        width: 26,
-                        height: 26,
-                        borderRadius: "50%",
-                        background: h.landed.hex,
-                        border: "2px solid #222",
-                        cursor: "pointer",
-                      }}
-                    />
-                  ))}
+
+              {/* ===== HISTORY DOTS ===== */}
+              <div style={{ display: "flex", gap: 6, flexWrap: "wrap", justifyContent: "center", marginTop: 18, zIndex: 2 }}>
+                {history.length === 0 && <p style={{ color: "rgba(255,255,255,0.3)", fontSize: 13 }}>Sin partidas aún</p>}
+                {!isRoundActive && history.map((h, i) => (
+                  <div key={i} className="hist-dot" onClick={() => setView("historial")}
+                    style={{ background: h.landed.hex, boxShadow: `0 0 8px ${h.landed.hex}` }} />
+                ))}
               </div>
             </>
           )}
