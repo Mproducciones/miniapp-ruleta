@@ -107,110 +107,86 @@ export default function ColorPlaneGame() {
 
   const sectionAngle = 360 / sections.length; // degrees per section
 
-  /* ---- SVG wheel renderer (siempre visible en todos los navegadores) ---- */
+  /* ---- SVG wheel renderer — colores sólidos, sin url(#id) en secciones ---- */
   const WheelSVG = useMemo(() => {
     const cx = 160, cy = 160, r = 152, textR = 100, hubR = 28;
-    const degToRad = (d) => d * Math.PI / 180;
+    const toRad = (d) => d * Math.PI / 180;
+
+    // Color sólido directo por nombre — garantizado visible en cualquier navegador
+    const solidColor = (sec) => {
+      if (sec.name === "NEGRO")  return "#1a1a4e";
+      if (sec.name === "BLANCO") return "#f0f0e8";
+      if (sec.name === "AZUL")   return "#0055ff";
+      return "#ee0000"; // ROJO
+    };
 
     return (
-      <svg viewBox="0 0 320 320" style={{ width: "100%", height: "100%", display: "block" }}>
+      <svg viewBox="0 0 320 320" width="100%" height="100%" style={{ display: "block" }}
+        xmlns="http://www.w3.org/2000/svg">
         <defs>
-          {/* Brillo glossy */}
-          <radialGradient id="gloss" cx="38%" cy="30%" r="65%">
-            <stop offset="0%" stopColor="rgba(255,255,255,0.28)" />
-            <stop offset="50%" stopColor="rgba(255,255,255,0.05)" />
-            <stop offset="100%" stopColor="rgba(0,0,0,0.18)" />
+          <radialGradient id="wg-gloss" cx="38%" cy="30%" r="65%">
+            <stop offset="0%"   stopColor="#ffffff" stopOpacity="0.30" />
+            <stop offset="50%"  stopColor="#ffffff" stopOpacity="0.04" />
+            <stop offset="100%" stopColor="#000000" stopOpacity="0.18" />
           </radialGradient>
-          {/* Hub metalico */}
-          <radialGradient id="hub" cx="35%" cy="30%" r="70%">
-            <stop offset="0%" stopColor="#ffffff" />
-            <stop offset="40%" stopColor="#dddddd" />
+          <radialGradient id="wg-hub" cx="35%" cy="30%" r="70%">
+            <stop offset="0%"   stopColor="#ffffff" />
+            <stop offset="40%"  stopColor="#dddddd" />
             <stop offset="100%" stopColor="#888888" />
           </radialGradient>
-          <filter id="glow-red"><feGaussianBlur stdDeviation="3" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
-          <filter id="glow-blue"><feGaussianBlur stdDeviation="3" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
         </defs>
 
-        {/* Secciones coloreadas */}
+        {/* Secciones — fill sólido sin url() interno */}
         {sections.map((sec, i) => {
-          const startDeg = i * sectionAngle;
-          const endDeg   = (i + 1) * sectionAngle;
-          const startRad = degToRad(startDeg);
-          const endRad   = degToRad(endDeg);
-          const x1 = cx + r * Math.cos(startRad);
-          const y1 = cy + r * Math.sin(startRad);
-          const x2 = cx + r * Math.cos(endRad);
-          const y2 = cy + r * Math.sin(endRad);
+          const a0 = toRad(i * sectionAngle);
+          const a1 = toRad((i + 1) * sectionAngle);
+          const x1 = cx + r * Math.cos(a0), y1 = cy + r * Math.sin(a0);
+          const x2 = cx + r * Math.cos(a1), y2 = cy + r * Math.sin(a1);
           const large = sectionAngle > 180 ? 1 : 0;
-          const fill  = sec.hex === '#000000' ? '#111122' : sec.hex;
-
-          // Gradiente radial por sección (más claro en centro, más oscuro fuera)
-          const { r: rv, g: gv, b: bv } = hexToRgb(fill === '#111122' ? '#2a2a55' : fill);
-          const lighter = `rgb(${Math.min(255,rv+60)},${Math.min(255,gv+60)},${Math.min(255,bv+60)})`;
-          const darker  = `rgb(${Math.max(0,rv-30)},${Math.max(0,gv-30)},${Math.max(0,bv-30)})`;
-
           return (
-            <g key={i}>
-              <defs>
-                <linearGradient id={`g${i}`} gradientUnits="userSpaceOnUse"
-                  x1={cx} y1={cy}
-                  x2={cx + r * Math.cos(degToRad(startDeg + sectionAngle/2))}
-                  y2={cy + r * Math.sin(degToRad(startDeg + sectionAngle/2))}
-                >
-                  <stop offset="0%"   stopColor={lighter} />
-                  <stop offset="100%" stopColor={darker}  />
-                </linearGradient>
-              </defs>
-              <path
-                d={`M ${cx} ${cy} L ${x1} ${y1} A ${r} ${r} 0 ${large} 1 ${x2} ${y2} Z`}
-                fill={`url(#g${i})`}
-                stroke="rgba(0,0,0,0.55)"
-                strokeWidth={1.5}
-              />
-            </g>
+            <path key={i}
+              d={`M${cx},${cy} L${x1},${y1} A${r},${r} 0 ${large},1 ${x2},${y2} Z`}
+              fill={solidColor(sec)}
+              stroke="rgba(255,255,255,0.35)"
+              strokeWidth="1.5"
+            />
           );
         })}
 
-        {/* Brillo glossy */}
-        <circle cx={cx} cy={cy} r={r} fill="url(#gloss)" />
+        {/* Brillo glossy encima — usa defs del nivel SVG, siempre funciona */}
+        <circle cx={cx} cy={cy} r={r} fill="url(#wg-gloss)" />
 
-        {/* Borde exterior */}
-        <circle cx={cx} cy={cy} r={r} fill="none" stroke="rgba(255,255,255,0.3)" strokeWidth={2} />
-        <circle cx={cx} cy={cy} r={r-2} fill="none" stroke="rgba(0,0,0,0.4)" strokeWidth={1} />
+        {/* Borde */}
+        <circle cx={cx} cy={cy} r={r} fill="none" stroke="rgba(255,255,255,0.4)" strokeWidth="2" />
 
-        {/* Etiquetas de multiplicadores */}
+        {/* Etiquetas */}
         {sections.map((sec, i) => {
-          const midRad = degToRad((i + 0.5) * sectionAngle);
-          const tx = cx + textR * Math.cos(midRad);
-          const ty = cy + textR * Math.sin(midRad);
+          const mid = toRad((i + 0.5) * sectionAngle);
+          const tx  = cx + textR * Math.cos(mid);
+          const ty  = cy + textR * Math.sin(mid);
           const rot = (i + 0.5) * sectionAngle + 90;
-          const isWhite = sec.hex === "#ffffff";
-          const fill = isWhite ? "#111" : "#fff";
-
+          const isLight = sec.name === "BLANCO";
+          const tf  = isLight ? "#111111" : "#ffffff";
           return (
             <g key={`t${i}`} transform={`translate(${tx},${ty}) rotate(${rot})`}>
               {sec.multiplier > 0 ? (
                 <text textAnchor="middle" dominantBaseline="middle"
-                  fill={fill} fontSize={14} fontWeight="900"
-                  fontFamily="Impact, 'Lilita One', Arial Narrow, sans-serif"
-                  style={{ paintOrder: "stroke", stroke: "rgba(0,0,0,0.6)", strokeWidth: 3 }}
-                >
-                  x{sec.multiplier}
-                </text>
+                  fill={tf} fontSize="14" fontWeight="900"
+                  fontFamily="Impact,Arial Narrow,sans-serif"
+                  stroke="rgba(0,0,0,0.65)" strokeWidth="3" paintOrder="stroke"
+                >x{sec.multiplier}</text>
               ) : (
                 <>
                   <text textAnchor="middle" dominantBaseline="middle"
-                    fill="#ff4444" fontSize={8} fontWeight="900"
-                    fontFamily="Impact, Arial Narrow, sans-serif"
-                    style={{ paintOrder: "stroke", stroke: "rgba(0,0,0,0.8)", strokeWidth: 2 }}
-                    y={-5}
-                  >PIERDE</text>
+                    fill="#ff4444" fontSize="8" fontWeight="900"
+                    fontFamily="Impact,Arial Narrow,sans-serif"
+                    stroke="rgba(0,0,0,0.8)" strokeWidth="2" paintOrder="stroke"
+                    y="-5">PIERDE</text>
                   <text textAnchor="middle" dominantBaseline="middle"
-                    fill="#ff4444" fontSize={8} fontWeight="900"
-                    fontFamily="Impact, Arial Narrow, sans-serif"
-                    style={{ paintOrder: "stroke", stroke: "rgba(0,0,0,0.8)", strokeWidth: 2 }}
-                    y={5}
-                  >TODO</text>
+                    fill="#ff4444" fontSize="8" fontWeight="900"
+                    fontFamily="Impact,Arial Narrow,sans-serif"
+                    stroke="rgba(0,0,0,0.8)" strokeWidth="2" paintOrder="stroke"
+                    y="5">TODO</text>
                 </>
               )}
             </g>
@@ -218,8 +194,8 @@ export default function ColorPlaneGame() {
         })}
 
         {/* Hub central */}
-        <circle cx={cx} cy={cy} r={hubR} fill="url(#hub)" stroke="rgba(255,255,255,0.5)" strokeWidth={2} />
-        <circle cx={cx} cy={cy} r={hubR-8} fill="none" stroke="rgba(0,0,0,0.2)" strokeWidth={1} />
+        <circle cx={cx} cy={cy} r={hubR} fill="url(#wg-hub)" stroke="rgba(255,255,255,0.5)" strokeWidth="2" />
+        <circle cx={cx} cy={cy} r={hubR - 8} fill="none" stroke="rgba(0,0,0,0.25)" strokeWidth="1" />
       </svg>
     );
   }, [sectionAngle]);
