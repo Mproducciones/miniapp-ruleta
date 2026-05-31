@@ -34,7 +34,7 @@ const useSound = (url) => {
 const INITIAL_PLAYER_BALANCE = 1000.0;
 const MAX_HISTORY = 10;
 const MAX_BET = 100.0;
-const API_URL = "http://localhost:3001"; // 🚨 Reemplaza con la URL de tu backend en producción
+const API_URL = ""; // Vacío = rutas relativas (/api/verify), funciona en Vercel y local con proxy
 
 /* ===== SECCIONES RUEDA ===== */
 const sections = [
@@ -79,6 +79,7 @@ export default function ColorPlaneGame() {
   const radius = 160;
 
   const [isVerified, setIsVerified] = useState(false);
+  const [toast, setToast] = useState(null); // { text, type: 'win'|'lose'|'info' }
 
   const playSpinSound = useSound('/sounds/spin.mp3');
   const playWinSound = useSound('/sounds/win.mp3');
@@ -164,6 +165,12 @@ export default function ColorPlaneGame() {
     return () => timersRef.current.forEach((t) => clearTimeout(t));
   }, []);
 
+  useEffect(() => {
+    if (!toast) return;
+    const t = setTimeout(() => setToast(null), 3500);
+    return () => clearTimeout(t);
+  }, [toast]);
+
   const pushHistory = (landed, bets, totalWin, losses) => {
     const now = new Date();
     const fecha = now.toLocaleDateString();
@@ -177,8 +184,8 @@ export default function ColorPlaneGame() {
   const spin = () => {
     const totalBet = bets.rojo + bets.azul + bets.blanco;
     if (spinning) return;
-    if (totalBet <= 0) return alert("Debes apostar al menos en un color");
-    if (totalBet > playerBalance) return alert("Saldo insuficiente");
+    if (totalBet <= 0) { setToast({ text: "Debes apostar al menos en un color", type: 'info' }); return; }
+    if (totalBet > playerBalance) { setToast({ text: "Saldo insuficiente", type: 'info' }); return; }
 
     setSpinning(true);
     setIsRoundActive(true);
@@ -232,17 +239,15 @@ export default function ColorPlaneGame() {
         }
 
         if (landed.name === "NEGRO") {
-          alert("Cayó NEGRO 😢 Pierdes todas las apuestas");
-          playLoseSound(); 
+          playLoseSound();
+          setToast({ text: "Cayó NEGRO 😢 Pierdes todas las apuestas", type: 'lose' });
         } else if (totalWin > 0) {
-          setTimeout(() => {
-            setPlayerBalance((p) => Number((p + totalWin).toFixed(8)));
-            alert(`✅ Ganaste ${totalWin.toFixed(0)} puntos. Apostaste ${bets[landedColor].toFixed(0)} puntos en ${landed.name}.`);
-            playWinSound(); 
-          }, 50);
+          setPlayerBalance((p) => Number((p + totalWin).toFixed(8)));
+          playWinSound();
+          setToast({ text: `✅ Ganaste ${totalWin.toFixed(0)} puntos en ${landed.name}!`, type: 'win' });
         } else {
-          alert("❌ Perdiste esta ronda.");
-          playLoseSound(); 
+          playLoseSound();
+          setToast({ text: "❌ Perdiste esta ronda.", type: 'lose' });
         }
 
         pushHistory(landed, bets, totalWin, losses);
@@ -266,7 +271,7 @@ export default function ColorPlaneGame() {
     setBets((prev) => {
       const total = prev.rojo + prev.azul + prev.blanco + chipValue;
       if (total > MAX_BET) {
-        alert(`No puedes apostar más de ${MAX_BET} puntos en total`);
+        setToast({ text: `Máximo ${MAX_BET} puntos en total`, type: 'info' });
         return prev;
       }
       playBetSound();
@@ -288,7 +293,7 @@ export default function ColorPlaneGame() {
       };
       const total = doubled.rojo + doubled.azul + doubled.blanco;
       if (total > MAX_BET) {
-        alert("El doble supera el límite de apuesta");
+        setToast({ text: "El doble supera el límite de apuesta", type: 'info' });
         return prev;
       }
       return doubled;
@@ -426,27 +431,18 @@ export default function ColorPlaneGame() {
             app_id="app_staging_040375f564177d0137cfac4a180f1464"
             action="my_action"
             handleVerify={async (result) => {
-              try {
-                const response = await fetch(`${API_URL}/verify`, {
-                  method: "POST",
-                  headers: {
-                    "Content-Type": "application/json",
-                  },
-                  body: JSON.stringify(result),
-                });
-                if (response.ok) {
-                  const data = await response.json();
-                  console.log("Verificación exitosa en el backend:", data);
-                  setIsVerified(true);
-                  alert("¡Verificación de World ID exitosa! Ya puedes jugar.");
-                } else {
-                  const errorData = await response.json();
-                  throw new Error(errorData.detail || "Verificación fallida");
-                }
-              } catch (error) {
-                console.error("Error durante la verificación:", error);
-                alert(`Error en la verificación: ${error.message}`);
+              const response = await fetch(`${API_URL}/api/verify`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(result),
+              });
+              if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.detail || "Verificación fallida en el servidor");
               }
+            }}
+            onSuccess={() => {
+              setIsVerified(true);
             }}
           >
             {({ open }) => (
@@ -726,6 +722,39 @@ export default function ColorPlaneGame() {
           )}
           {renderView()}
         </>
+      )}
+      {toast && (
+        <div
+          onClick={() => setToast(null)}
+          style={{
+            position: "fixed",
+            inset: 0,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 100,
+            background: "rgba(0,0,0,0.55)",
+          }}
+        >
+          <div
+            style={{
+              background: toast.type === 'win' ? "#1a7a1a" : toast.type === 'lose' ? "#7a1a1a" : "#333",
+              color: "#fff",
+              padding: "28px 36px",
+              borderRadius: 16,
+              fontSize: 22,
+              fontWeight: "bold",
+              textAlign: "center",
+              maxWidth: 320,
+              boxShadow: "0 8px 32px rgba(0,0,0,0.5)",
+            }}
+          >
+            {toast.text}
+            <div style={{ fontSize: 14, fontWeight: "normal", marginTop: 14, opacity: 0.8 }}>
+              Toca para continuar
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
