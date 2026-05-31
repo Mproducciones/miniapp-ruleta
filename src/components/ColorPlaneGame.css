@@ -111,7 +111,7 @@
 /* Neon ring */
 .neon-ring {
   position: absolute;
-  inset: -12px;
+  inset: -4px;
   border-radius: 50%;
   border: 3px solid transparent;
   background:

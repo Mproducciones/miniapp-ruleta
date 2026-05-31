@@ -59,12 +59,19 @@ const hexToRgb = (hex) => {
 /* ===== BUNTING FLAG COLORS ===== */
 const BUNTING_COLORS = ["#e8001d","#ffd700","#0052cc","#ff6b00","#4ade80","#a855f7","#e8001d","#ffd700","#0052cc","#ff6b00","#4ade80","#a855f7","#e8001d","#ffd700","#0052cc","#ff6b00"];
 
-/* ===== SHOP PACKAGES ===== */
+/* ===== SHOP PACKAGES =====
+   Precio fijo en USD (1 ficha = USD 0.01).
+   WLD se calcula en tiempo real al pagar: usdAmount / wldPriceUSD.
+   Esto protege de la volatilidad del WLD.
+   ============================= */
+const FICHA_USD_PRICE = 0.01; // 1 ficha = USD $0.01
 const SHOP_PACKAGES = [
-  { id: "free",  label: "500 Fichas",  amount: 500,  price: "GRATIS", priceClass: "free", wld: null },
-  { id: "basic", label: "1500 Fichas", amount: 1500, price: "0.25 WLD", priceClass: "", wld: "0.25" },
-  { id: "pro",   label: "5000 Fichas", amount: 5000, price: "0.75 WLD", priceClass: "", wld: "0.75" },
+  { id: "starter", label: "500 Fichas",  amount: 500,  usd: 0,    desc: "Prueba gratis",  priceClass: "free", wld: null },
+  { id: "basic",   label: "1500 Fichas", amount: 1500, usd: 5.00, desc: "USD $5.00",      priceClass: "",     wld: null },
+  { id: "plus",    label: "4000 Fichas", amount: 4000, usd: 10.00,desc: "USD $10.00",     priceClass: "",     wld: null },
+  { id: "pro",     label: "10000 Fichas",amount: 10000,usd: 20.00,desc: "USD $20.00 🔥",  priceClass: "hot",  wld: null },
 ];
+// Tu dirección de wallet para recibir pagos WLD
 const PAYMENT_ADDRESS = "0x0000000000000000000000000000000000000000";
 
 export default function ColorPlaneGame() {
@@ -428,29 +435,43 @@ export default function ColorPlaneGame() {
 
   /* ---- Shop purchase ---- */
   const handleBuyPackage = async (pkg) => {
-    if (!pkg.wld) {
-      // Free package — add directly
+    // Paquete gratuito
+    if (pkg.usd === 0) {
       setPlayerBalance((p) => p + pkg.amount);
       setShowShop(false);
       setToast({ text: `+${pkg.amount} fichas añadidas!`, type: 'win' });
       return;
     }
+
     if (inWorldApp) {
       try {
-        await MiniKit.pay({
+        // Obtener precio WLD en tiempo real para cobrar precio USD fijo
+        let wldAmount = pkg.usd; // fallback: 1:1 si no hay precio
+        try {
+          const priceRes = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=worldcoin-wld&vs_currencies=usd');
+          const priceData = await priceRes.json();
+          const wldUsdPrice = priceData['worldcoin-wld']?.usd || 1;
+          wldAmount = (pkg.usd / wldUsdPrice).toFixed(6);
+        } catch (_) { /* usar fallback */ }
+
+        const result = await MiniKit.pay({
           to: PAYMENT_ADDRESS,
-          tokens: [{ symbol: "WLD", token_amount: pkg.wld }],
-          description: `${pkg.label} — Avión de Colores`,
+          tokens: [{ symbol: "WLD", token_amount: String(wldAmount) }],
+          description: `${pkg.label} — Avión de Colores (USD $${pkg.usd})`,
           reference: `fichas-${pkg.id}-${Date.now()}`,
         });
-        setPlayerBalance((p) => p + pkg.amount);
-        setShowShop(false);
-        setToast({ text: `+${pkg.amount} fichas añadidas!`, type: 'win' });
+        if (result?.finalPayload?.status === 'success') {
+          setPlayerBalance((p) => p + pkg.amount);
+          setShowShop(false);
+          setToast({ text: `+${pkg.amount} fichas añadidas!`, type: 'win' });
+        } else {
+          setToast({ text: "Pago cancelado.", type: 'lose' });
+        }
       } catch (err) {
-        setToast({ text: "Pago cancelado o fallido.", type: 'lose' });
+        setToast({ text: "Error en el pago. Inténtalo de nuevo.", type: 'lose' });
       }
     } else {
-      // Demo mode — add directly
+      // Demo mode — agrega fichas directo (sin pago real)
       setPlayerBalance((p) => p + pkg.amount);
       setShowShop(false);
       setToast({ text: `+${pkg.amount} fichas añadidas! (modo demo)`, type: 'win' });
@@ -686,6 +707,7 @@ export default function ColorPlaneGame() {
                 style={{
                   position: "absolute", top: -20, left: -23,
                   width: "111%", height: "111%",
+                  mixBlendMode: "screen",
                   pointerEvents: "none", zIndex: 15,
                 }}
               />
@@ -1045,7 +1067,9 @@ export default function ColorPlaneGame() {
                 </motion.button>
 
                 <div className="shop-title gold-text">COMPRAR FICHAS</div>
-                <div className="shop-subtitle">Elige tu paquete de fichas</div>
+                <div className="shop-subtitle">
+                  Precio fijo en USD — pagado en WLD al tipo de cambio del momento
+                </div>
 
                 {SHOP_PACKAGES.map((pkg, idx) => (
                   <motion.div
@@ -1057,23 +1081,24 @@ export default function ColorPlaneGame() {
                     transition={{ delay: 0.1 + idx * 0.08 }}
                     whileTap={{ scale: 0.96 }}
                     whileHover={{ scale: 1.02 }}
+                    style={{ border: pkg.priceClass === 'hot' ? '1px solid #ffd700' : undefined }}
                   >
                     <span className="ficha-pkg-coin">🪙</span>
                     <div className="ficha-pkg-info">
                       <div className="ficha-pkg-amount">{pkg.label}</div>
-                      <div className="ficha-pkg-label">
-                        {pkg.wld ? `Pago con WLD` : "Demo gratuito"}
-                      </div>
+                      <div className="ficha-pkg-label">{pkg.desc}</div>
                     </div>
-                    <div className={`ficha-pkg-price ${pkg.priceClass}`}>{pkg.price}</div>
+                    <div className={`ficha-pkg-price ${pkg.usd === 0 ? 'free' : ''}`}>
+                      {pkg.usd === 0 ? 'GRATIS' : `$${pkg.usd}`}
+                    </div>
                   </motion.div>
                 ))}
 
-                {!inWorldApp && (
-                  <p style={{ color: "rgba(255,255,255,0.38)", fontSize: 12, textAlign: "center", marginTop: 14 }}>
-                    Abre en World App para pagos reales con WLD.
-                  </p>
-                )}
+                <p style={{ color: "rgba(255,255,255,0.35)", fontSize: 11, textAlign: "center", marginTop: 14, lineHeight: 1.5 }}>
+                  {inWorldApp
+                    ? "El pago en WLD equivale al precio USD del momento."
+                    : "Abre en World App para pagar con WLD. En modo demo las fichas son gratuitas."}
+                </p>
               </motion.div>
             </div>
           </>
