@@ -29,7 +29,7 @@ const useSound = (url) => {
 /* ===== CONFIG ===== */
 const INITIAL_PLAYER_BALANCE = 1000.0;
 const MAX_HISTORY = 10;
-const MAX_BET = 100.0;
+const MAX_BET = 25; // 0.5% del pozo inicial de 50 WLD — sube con el pozo
 const API_URL = "";
 
 /* ===== SECCIONES RUEDA ===== */
@@ -103,7 +103,7 @@ export default function ColorPlaneGame() {
   const [spinning,          setSpinning]           = useState(false);
   const [isRoundActive,     setIsRoundActive]      = useState(false);
   const [result,            setResult]             = useState(null);
-  const [chipValue,         setChipValue]          = useState(10);
+  const [chipValue,         setChipValue]          = useState(5);
   const [bets,              setBets]               = useState({ rojo: 0, azul: 0, blanco: 0 });
   const [lastBets,          setLastBets]           = useState(null);
   const [playerBalance,     setPlayerBalance]      = useState(INITIAL_PLAYER_BALANCE);
@@ -986,7 +986,7 @@ export default function ColorPlaneGame() {
             className="chip-selector"
             style={{ marginTop: 14 }}
           >
-            {[10, 50, 100].map((val, idx) => (
+            {[5, 10, 25].map((val, idx) => (
               <motion.button
                 key={val}
                 className={chipValue === val ? "active" : ""}

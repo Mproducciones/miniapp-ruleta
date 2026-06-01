@@ -1,7 +1,7 @@
 import supabase from "./lib/supabase.js";
 import { spinResult, calcWin, totalBet } from "./lib/game.js";
 
-const MAX_BET = 100;
+const MAX_BET = 25; // 0.5% del pozo inicial de 50 WLD
 
 // POST /api/spin  { wallet, bets: { rojo, azul, blanco } }
 export default async function handler(req, res) {
