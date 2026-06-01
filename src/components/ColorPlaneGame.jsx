@@ -81,6 +81,23 @@ export default function ColorPlaneGame() {
 
   const SPIN_DUR = 4200;
 
+  /* ---- Crear/cargar jugador en Supabase ---- */
+  const initPlayer = useCallback(async (walletAddr) => {
+    try {
+      const res  = await fetch("/api/player", {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify({ wallet: walletAddr }),
+      });
+      const data = await res.json();
+      if (data.ok && data.player) {
+        setPlayerBalance(data.player.fichas);
+      }
+    } catch (e) {
+      console.error("initPlayer error:", e);
+    }
+  }, []);
+
   /* ---- Game state ---- */
   const [rotation,          setRotation]          = useState(0);
   const [spinning,          setSpinning]           = useState(false);
@@ -95,13 +112,15 @@ export default function ColorPlaneGame() {
 
   /* ---- UI state ---- */
   const [isVerified,  setIsVerified]  = useState(false);
+  const [wallet,      setWallet]      = useState(null);
+  const [showRedeem,  setShowRedeem]  = useState(false);
   const inWorldApp = useMemo(() => MiniKit.isInstalled(), []);
   const [toast,       setToast]       = useState(null);
   const [screenFlash, setScreenFlash] = useState(null);
   const [burstParticles, setBurstParticles] = useState([]);
   const [showShop,    setShowShop]    = useState(false);
   const [showHistory, setShowHistory] = useState(false);
-  const [lastWin,     setLastWin]     = useState(null); // { amount, color, name }
+  const [lastWin,     setLastWin]     = useState(null);
 
   const radius = 160;
 
@@ -416,53 +435,61 @@ export default function ColorPlaneGame() {
     });
   };
 
-  /* ---- SPIN ---- */
-  const spin = () => {
+  /* ---- SPIN — resultado decidido por el servidor ---- */
+  const spin = async () => {
     const totalBet = bets.rojo + bets.azul + bets.blanco;
     if (spinning) return;
-    if (totalBet <= 0)           { setToast({ text: "Debes apostar al menos en un color", type: 'info' }); return; }
-    if (totalBet > playerBalance){ setToast({ text: "Saldo insuficiente", type: 'info' }); return; }
+    if (totalBet <= 0)            { setToast({ text: "Debes apostar al menos en un color", type: 'info' }); return; }
+    if (totalBet > playerBalance) { setToast({ text: "Saldo insuficiente", type: 'info' }); return; }
 
     setSpinning(true);
     setIsRoundActive(true);
     setResult(null);
     setLastWin(null);
-    setPlayerBalance((p) => Number((p - totalBet).toFixed(8)));
-    setLastBets(bets);
     setLightAnimationState('flicker');
     playSpinSound();
-    drawWheel(); // Limpiar highlight del giro anterior
 
-    const randomRotation = 360 * 7 + Math.floor(Math.random() * 360);
-    const final = rotation + randomRotation;
-    setRotation(final);
+    // Llamar al servidor ANTES de animar — resultado imposible de manipular
+    let spinData;
+    try {
+      const res = await fetch("/api/spin", {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify({ wallet: wallet || "guest", bets }),
+      });
+      spinData = await res.json();
+      if (!spinData.ok) {
+        setToast({ text: spinData.message || "Error en el servidor", type: 'lose' });
+        setSpinning(false);
+        setIsRoundActive(false);
+        setLightAnimationState('idle');
+        return;
+      }
+    } catch {
+      // Modo offline/demo: calcular localmente si no hay backend
+      const idx  = Math.floor(Math.random() * sections.length);
+      const sec  = sections[idx];
+      const won  = sec.name === "NEGRO" ? 0 : (bets[sec.name.toLowerCase()] ?? 0) * sec.multiplier;
+      spinData = { ok: true, sectionIndex: idx, section: sec.name, won: Math.floor(won), net: Math.floor(won) - totalBet, newBalance: playerBalance - totalBet + Math.floor(won) };
+    }
+
+    setLastBets(bets);
+    setPlayerBalance((p) => p - totalBet); // descuento visual inmediato
+
+    // Calcular rotación para aterrizar en la sección que decidió el servidor
+    const sectionSize = 360 / sections.length;
+    const targetAngle = (spinData.sectionIndex * sectionSize + sectionSize / 2 - 270 + 720) % 360;
+    const currentNorm = ((rotation % 360) + 360) % 360;
+    const diff        = (targetAngle - currentNorm + 360) % 360;
+    const finalRot    = rotation + 7 * 360 + diff;
+    setRotation(finalRot);
 
     const tEnd = setTimeout(() => {
-      const normalized = (final % 360 + 360) % 360;
-      const sectionSize = 360 / sections.length;
-      // rotate(0deg) = nariz hacia adentro = apunta directamente a la sección bajo el cuerpo del avión
-      // El avión en 12 en punto → canvas 270° → sección 10. Al rotar N° → canvas (270+N)%360
-      const canvasAngle = (270 + normalized) % 360;
-      const index       = Math.floor(canvasAngle / sectionSize) % sections.length;
-      const landed      = sections[index];
+      const landed = sections[spinData.sectionIndex];
       setResult(landed);
+      setPlayerBalance(spinData.newBalance); // balance confirmado por servidor
 
-      // Resaltar la sección ganadora en el canvas
-      drawWheel();
-      setTimeout(() => highlightSection(index), 50);
-
-      let totalWin = 0;
-      let losses   = {};
-      const landedColor = landed.name.toLowerCase();
-
-      if      (landedColor === "rojo"   && bets.rojo   > 0) totalWin = bets.rojo   * landed.multiplier;
-      else if (landedColor === "azul"   && bets.azul   > 0) totalWin = bets.azul   * landed.multiplier;
-      else if (landedColor === "blanco" && bets.blanco > 0) totalWin = bets.blanco * landed.multiplier;
-
-      if (landedColor !== "rojo")   losses.rojo   = bets.rojo;
-      if (landedColor !== "azul")   losses.azul   = bets.azul;
-      if (landedColor !== "blanco") losses.blanco = bets.blanco;
-      if (landedColor === "negro")  { losses.rojo = bets.rojo; losses.azul = bets.azul; losses.blanco = bets.blanco; }
+      const won = spinData.won;
 
       if (landed.name === "NEGRO") {
         playLoseSound();
@@ -470,13 +497,12 @@ export default function ColorPlaneGame() {
         setScreenFlash({ color: "rgba(80,0,0,0.6)", key: Date.now() });
         setLastWin({ amount: 0, color: landed.hex, name: landed.name, won: false });
         setToast({ text: "Cayó NEGRO 😢 Pierdes todas las apuestas", type: 'lose' });
-      } else if (totalWin > 0) {
-        setPlayerBalance((p) => Number((p + totalWin).toFixed(8)));
+      } else if (won > 0) {
         playWinSound();
         triggerBurst(landed.hex);
         setScreenFlash({ color: landed.hex === '#ffffff' ? 'rgba(200,200,200,0.4)' : `${landed.hex}55`, key: Date.now() });
-        setLastWin({ amount: totalWin, color: landed.hex, name: landed.name, won: true });
-        setToast({ text: `✅ Ganaste ${totalWin.toFixed(0)} fichas en ${landed.name}!`, type: 'win' });
+        setLastWin({ amount: won, color: landed.hex, name: landed.name, won: true });
+        setToast({ text: `✅ Ganaste ${won} fichas en ${landed.name}!`, type: 'win' });
         confetti({ particleCount: 130, spread: 75, origin: { y: 0.45 }, colors: [landed.hex, '#ffd700', '#ffffff'] });
       } else {
         playLoseSound();
@@ -486,7 +512,7 @@ export default function ColorPlaneGame() {
         setToast({ text: "❌ Perdiste esta ronda.", type: 'lose' });
       }
 
-      pushHistory(landed, bets, totalWin, losses);
+      pushHistory(landed, bets, won, {});
       setLightAnimationState('on');
 
       const tFinish = setTimeout(() => {
@@ -556,9 +582,20 @@ export default function ColorPlaneGame() {
           reference: `fichas-${pkg.id}-${Date.now()}`,
         });
         if (result?.finalPayload?.status === 'success') {
-          setPlayerBalance((p) => p + pkg.amount);
-          setShowShop(false);
-          setToast({ text: `+${pkg.amount} fichas añadidas!`, type: 'win' });
+          const txHash = result.finalPayload.transaction_id || null;
+          // Registrar en backend y acreditar fichas
+          const buyRes  = await fetch("/api/buy", {
+            method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ wallet, packageId: pkg.id, txHash }),
+          });
+          const buyData = await buyRes.json();
+          if (buyData.ok) {
+            setPlayerBalance(buyData.newBalance);
+            setShowShop(false);
+            setToast({ text: `+${pkg.amount} fichas añadidas!`, type: 'win' });
+          } else {
+            setToast({ text: buyData.message || "Error acreditando fichas", type: 'lose' });
+          }
         } else {
           setToast({ text: "Pago cancelado.", type: 'lose' });
         }
@@ -566,10 +603,25 @@ export default function ColorPlaneGame() {
         setToast({ text: "Error en el pago. Inténtalo de nuevo.", type: 'lose' });
       }
     } else {
-      // Demo mode — agrega fichas directo (sin pago real)
-      setPlayerBalance((p) => p + pkg.amount);
-      setShowShop(false);
-      setToast({ text: `+${pkg.amount} fichas añadidas! (modo demo)`, type: 'win' });
+      // Demo / invitado — acreditar vía backend igual
+      try {
+        const buyRes  = await fetch("/api/buy", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ wallet: wallet || "guest", packageId: pkg.id }),
+        });
+        const buyData = await buyRes.json();
+        if (buyData.ok) {
+          setPlayerBalance(buyData.newBalance);
+          setShowShop(false);
+          setToast({ text: `+${pkg.amount} fichas añadidas!${!inWorldApp ? " (demo)" : ""}`, type: 'win' });
+        } else {
+          setToast({ text: buyData.message || "Error", type: 'lose' });
+        }
+      } catch {
+        setPlayerBalance((p) => p + pkg.amount);
+        setShowShop(false);
+        setToast({ text: `+${pkg.amount} fichas (offline)`, type: 'win' });
+      }
     }
   };
 
@@ -640,14 +692,27 @@ export default function ColorPlaneGame() {
           </motion.span>
           <span style={{ fontSize: 12, opacity: 0.7 }}> FICHAS</span>
         </div>
-        <motion.button
-          className="buy-btn"
-          whileTap={{ scale: 0.88 }}
-          whileHover={{ scale: 1.05 }}
-          onClick={() => setShowShop(true)}
-        >
-          + FICHAS
-        </motion.button>
+        <div style={{ display: "flex", gap: 6 }}>
+          {playerBalance >= 2000 && (
+            <motion.button
+              className="buy-btn"
+              whileTap={{ scale: 0.88 }}
+              whileHover={{ scale: 1.05 }}
+              onClick={() => setShowRedeem(true)}
+              style={{ background: "linear-gradient(135deg,#16a34a,#15803d)", borderColor: "#4ade80" }}
+            >
+              CANJEAR
+            </motion.button>
+          )}
+          <motion.button
+            className="buy-btn"
+            whileTap={{ scale: 0.88 }}
+            whileHover={{ scale: 1.05 }}
+            onClick={() => setShowShop(true)}
+          >
+            + FICHAS
+          </motion.button>
+        </div>
       </motion.div>
 
       {/* ======================================================
@@ -700,6 +765,9 @@ export default function ColorPlaneGame() {
                     });
                     const data = await res.json();
                     if (res.ok && data.ok) {
+                      const w = data.address || result.data?.address || "verified";
+                      setWallet(w);
+                      await initPlayer(w);
                       setIsVerified(true);
                     } else {
                       setToast({ text: data.message || 'Verificación fallida.', type: 'lose' });
@@ -725,7 +793,13 @@ export default function ColorPlaneGame() {
               <motion.button
                 className="verify-btn-guest"
                 whileTap={{ scale: 0.95 }}
-                onClick={() => setIsVerified(true)}
+                onClick={async () => {
+                  const guestId = localStorage.getItem("guest_wallet") || `guest_${crypto.randomUUID().replace(/-/g,"")}`;
+                  localStorage.setItem("guest_wallet", guestId);
+                  setWallet(guestId);
+                  await initPlayer(guestId);
+                  setIsVerified(true);
+                }}
               >
                 Jugar como invitado
               </motion.button>
@@ -1186,6 +1260,75 @@ export default function ColorPlaneGame() {
                     ? "El pago en WLD equivale al precio USD del momento."
                     : "Abre en World App para pagar con WLD. En modo demo las fichas son gratuitas."}
                 </p>
+              </motion.div>
+            </div>
+          </>
+        )}
+      </AnimatePresence>
+
+      {/* ======================================================
+          MODAL CANJE — fichas → WLD
+         ====================================================== */}
+      <AnimatePresence>
+        {showRedeem && (
+          <>
+            <motion.div className="drawer-overlay" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setShowRedeem(false)} />
+            <div className="shop-modal-wrap" style={{ zIndex: 85 }}>
+              <motion.div
+                className="shop-modal"
+                initial={{ scale: 0.7, opacity: 0, y: 40 }}
+                animate={{ scale: 1, opacity: 1, y: 0 }}
+                exit={{ scale: 0.75, opacity: 0, y: 30 }}
+                transition={{ type: "spring", stiffness: 280, damping: 24 }}
+              >
+                <motion.button className="shop-close-btn" onClick={() => setShowRedeem(false)} whileTap={{ scale: 0.85 }}>✕</motion.button>
+                <div className="shop-title gold-text">CANJEAR FICHAS</div>
+                <div className="shop-subtitle">Convertí tus fichas a WLD — 300 fichas = USD $1</div>
+
+                <div style={{ background: "rgba(255,255,255,0.05)", borderRadius: 14, padding: "18px 16px", marginBottom: 14, border: "1px solid rgba(74,222,128,0.25)" }}>
+                  <div style={{ fontSize: 13, color: "rgba(255,255,255,0.5)", marginBottom: 6 }}>Fichas disponibles</div>
+                  <div style={{ fontSize: 28, fontFamily: "'Lilita One',cursive", color: "#ffd700" }}>{playerBalance.toFixed(0)}</div>
+                  <div style={{ fontSize: 13, color: "#4ade80", marginTop: 4 }}>≈ USD ${(playerBalance / 300).toFixed(2)}</div>
+                </div>
+
+                <div style={{ fontSize: 12, color: "rgba(255,255,255,0.4)", marginBottom: 14, lineHeight: 1.6 }}>
+                  Mínimo 2.000 fichas (~$6.67). El pago en WLD llega a tu wallet en 24–48 hs.
+                </div>
+
+                {[2000, 5000, playerBalance >= 10000 ? 10000 : null].filter(Boolean).map(amt => (
+                  <motion.div
+                    key={amt}
+                    className="ficha-pkg"
+                    whileTap={{ scale: 0.96 }}
+                    whileHover={{ scale: 1.02 }}
+                    onClick={async () => {
+                      try {
+                        const res  = await fetch("/api/redeem", {
+                          method: "POST", headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({ wallet, fichas: amt }),
+                        });
+                        const data = await res.json();
+                        if (data.ok) {
+                          setPlayerBalance(data.newBalance);
+                          setShowRedeem(false);
+                          setToast({ text: data.message, type: 'win' });
+                        } else {
+                          setToast({ text: data.message, type: 'lose' });
+                        }
+                      } catch {
+                        setToast({ text: "Error de conexión", type: 'lose' });
+                      }
+                    }}
+                    style={{ opacity: playerBalance >= amt ? 1 : 0.4, cursor: playerBalance >= amt ? "pointer" : "not-allowed" }}
+                  >
+                    <span className="ficha-pkg-coin">💸</span>
+                    <div className="ficha-pkg-info">
+                      <div className="ficha-pkg-amount">{amt.toLocaleString()} fichas</div>
+                      <div className="ficha-pkg-label">≈ USD ${(amt / 300).toFixed(2)}</div>
+                    </div>
+                    <div className="ficha-pkg-price" style={{ background: "#16a34a" }}>CANJEAR</div>
+                  </motion.div>
+                ))}
               </motion.div>
             </div>
           </>
