@@ -713,7 +713,7 @@
 
 .wheel-ring {
   position: absolute; inset: -12px; border-radius: 50%; border: 3px solid transparent;
-  background: linear-gradient(#000,#000) padding-box,
+  background: transparent padding-box,
     conic-gradient(from 0deg,#ff0040,#ff8800,#ffe000,#00ff88,#00cfff,#a855f7,#ff0040) border-box;
   animation: ring-rotate 5s linear infinite; pointer-events: none; z-index: 2;
 }
